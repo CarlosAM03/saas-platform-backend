@@ -1,0 +1,203 @@
+openapi: 3.0.3
+info:
+  title: Prospector Service Internal API
+  version: 1.0.0
+  description: Contrato V1 interno entre Platform Backend y Prospector Service, incluyendo callbacks hacia Platform.
+servers:
+  - url: https://prospector.example.invalid
+    description: Placeholder; el entorno real se configura fuera del contrato.
+tags:
+  - name: Job Execution
+  - name: Platform Callback
+paths:
+  /api/v1/prospecting/jobs:
+    post:
+      tags: [Job Execution]
+      summary: Acepta la ejecución de un Job
+      operationId: acceptProspectingJob
+      security: [{ apiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartJobRequest' }
+      responses:
+        '202':
+          description: Solicitud aceptada y encolada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcceptedJobResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /api/v1/internal/prospecting-jobs/{jobId}/events:
+    post:
+      tags: [Platform Callback]
+      summary: Recibe un evento de ejecución del Prospector Service
+      operationId: receiveProspectingJobEvent
+      security: [{ apiKeyAuth: [] }]
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/Cuid' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProspectingJobEvent' }
+      responses:
+        '200':
+          description: Evento aceptado o ignorado por duplicidad/secuencia ya procesada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Credencial interna. La rotación y el mecanismo físico definitivo son decisiones de Fase 3.
+  responses:
+    BadRequest:
+      description: Solicitud inválida.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Unauthorized:
+      description: API Key ausente o inválida.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    NotFound:
+      description: Job no encontrado.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Conflict:
+      description: Conflicto de lifecycle o evento inválido.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    ServiceUnavailable:
+      description: Service temporalmente no disponible.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+  schemas:
+    SuccessResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: {}
+        meta: { type: object, additionalProperties: true }
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success: { type: boolean, enum: [false] }
+        error: { $ref: '#/components/schemas/ErrorBody' }
+    ErrorBody:
+      type: object
+      required: [code, message, details, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        timestamp: { type: string, format: date-time, description: ISO 8601 UTC. }
+    Cuid:
+      type: string
+      pattern: '^c[a-z0-9]{20,}$'
+      description: Identificador persistente CUID.
+    Uuid:
+      type: string
+      format: uuid
+    DateTime:
+      type: string
+      format: date-time
+      description: ISO 8601 UTC.
+    ProspectingJobStatus: { type: string, enum: [QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED] }
+    ProspectingQuery:
+      type: object
+      required: [keyword, location, source, limit]
+      properties:
+        keyword: { type: string }
+        location: { type: string }
+        source: { type: string, enum: [google_maps] }
+        limit: { type: integer, minimum: 1 }
+    StartJobRequest:
+      type: object
+      required: [jobId, tenantId, query, callbackUrl]
+      properties:
+        jobId: { $ref: '#/components/schemas/Cuid' }
+        tenantId: { $ref: '#/components/schemas/Cuid' }
+        query: { $ref: '#/components/schemas/ProspectingQuery' }
+        callbackUrl:
+          type: string
+          format: uri-reference
+          description: Endpoint HTTP del Platform para callbacks del Job.
+    AcceptedJob:
+      type: object
+      required: [jobId, status, acceptedAt]
+      properties:
+        jobId: { $ref: '#/components/schemas/Cuid' }
+        status: { type: string, enum: [QUEUED] }
+        acceptedAt: { $ref: '#/components/schemas/DateTime' }
+    AcceptedJobResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties: { data: { $ref: '#/components/schemas/AcceptedJob' } }
+    PipelineProgress:
+      type: object
+      nullable: true
+      required: [source, stage, message, percentage]
+      properties:
+        source: { type: string, enum: [google_maps] }
+        stage: { type: string }
+        message: { type: string }
+        percentage: { type: number, minimum: 0, maximum: 100 }
+      description: DTO de integración; no es persistido por Prospector Service ni Prisma.
+    BusinessResult:
+      type: object
+      required: [name, source]
+      properties:
+        name: { type: string }
+        category: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        website: { type: string, format: uri, nullable: true }
+        source: { type: string, enum: [google_maps] }
+        sourceIdentifier: { type: string, nullable: true }
+        language: { type: string, nullable: true }
+        metadata: { type: object, nullable: true, additionalProperties: true }
+      description: Resultado de integración temporal; no es un modelo Prisma.
+    JobEventError:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    ProspectingJobEvent:
+      type: object
+      required: [eventId, jobId, sequence, status, progress, timestamp, results, error]
+      properties:
+        eventId: { $ref: '#/components/schemas/Uuid' }
+        jobId: { $ref: '#/components/schemas/Cuid' }
+        sequence: { type: integer, minimum: 1 }
+        status: { $ref: '#/components/schemas/ProspectingJobStatus' }
+        progress: { $ref: '#/components/schemas/PipelineProgress' }
+        timestamp: { $ref: '#/components/schemas/DateTime' }
+        results:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/BusinessResult' }
+          description: Solo se entrega cuando status=COMPLETED.
+        error:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/JobEventError' }]
+          description: Solo se entrega cuando status=FAILED.
+    Lifecycle:
+      type: object
+      description: 'Transiciones V1: QUEUED -> RUNNING -> COMPLETED|FAILED|CANCELLED. No se definen estados adicionales.'
+    Meta:
+      type: object
+      additionalProperties: true
