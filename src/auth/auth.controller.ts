@@ -6,7 +6,7 @@ import { RateLimitGuard } from '../common/guards/rate-limit.guard';
 import { AuthService } from './auth.service';
 import { LoginRequest } from './dto/login.request';
 import { SelectTenantRequest } from './dto/select-tenant.request';
-import { Roles } from 'src/common/decorators/roles.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: { id: string };
