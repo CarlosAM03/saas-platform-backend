@@ -216,34 +216,32 @@ No se deben subir `.env`, passwords, JWT, API keys ni secretos.
 La estructura propuesta para el MVP es:
 
 ```text
-Backend_Nestjs/
-│
-├── saas-platform-backend/
-│   │
-│   ├── main.ts
-│   │
-│   ├── app.module.ts
-│   │
-│   ├── common/
-│   ├── auth/
-│   ├── users/
-│   ├── prisma/
-│   ├── tenants/
-│   ├── campaigns/
-│   ├── prospects/
-│   ├── prospecting-jobs/
-│   └── prospector-client/
-│
-├── Prisma/schema.prisma
-│
-├── test/
-│
-├── .env.example
-├── package.json
-├── tsconfig.json
-├── nest-cli.json
-├── MODULE-DEVELOPMENT.md
-├── README.md
+    saas-platform-backend/
+   │
+   ├── main.ts
+   │
+   ├── app.module.ts
+   │
+   ├── common/
+   ├── auth/
+   ├── users/
+   ├── prisma/
+   ├── tenants/
+   ├── campaigns/
+   ├── prospects/
+   ├── prospecting-jobs/
+   |── prospector-client/
+   │
+   ├── Prisma/schema.prisma
+   │
+   ├── test/
+   │
+   ├── .env.example
+   ├── package.json
+   ├── tsconfig.json
+   ├── nest-cli.json
+   ├── MODULE-DEVELOPMENT.md
+   ├── README.md
 ```
 
 La estructura es una **propuesta inicial**. Los módulos y responsabilidades podrán cambiar conforme se definan los requerimientos funcionales del sistema.
