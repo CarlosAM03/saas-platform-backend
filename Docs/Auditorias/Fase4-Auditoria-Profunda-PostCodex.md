@@ -226,6 +226,48 @@ Se mantuvieron las correcciones anteriores que sí respondían a F4 (por ejemplo
 
 No se presentan como pendientes F4: AGENTS, versionado obligatorio del plan externo, eliminación de READMEs, Redis/RLS/refresh tokens ni integración funcional Prospector. Las limitaciones iniciales de herramientas locales se resolvieron mediante comandos equivalentes y permisos de limpieza; PostgreSQL y los endpoints sí se verificaron.
 
-## 19. Veredicto final
+## 19. Apéndice — Cierre de Fase 4 como línea base
 
-**F4 NOT FULLY CLOSED.** La implementación local corregida supera pruebas y verificaciones operativas de esta auditoría, y resuelve los fallos históricos reproducidos. El cierre completo del repositorio entregable exige rotar las credenciales expuestas y publicar el estado reconciliado. No corresponde declarar `F4 CLOSED / 100% ALIGNED` mientras esos dos puntos sigan pendientes.
+Posterior a la auditoría profunda, las correcciones fueron publicadas y consolidadas en la rama `dev`, utilizada como rama formal de integración previa a `main`.
+
+Con este estado, la Fase 4 puede considerarse cerrada como **línea base técnica y documental del Platform Backend**.
+
+Este cierre no significa que exista todavía un entorno productivo definitivo ni que las credenciales actuales deban considerarse valores finales. Las credenciales locales y de desarrollo deberán rotarse antes de cualquier despliegue productivo o entorno real compartido.
+
+El cierre de Fase 4 significa que el backend cuenta con una base suficiente, alineada y verificable para continuar con el desarrollo funcional e integración del sistema.
+
+La línea base incluye:
+
+* estructura NestJS modular;
+* configuración transversal;
+* Prisma y PostgreSQL;
+* migración inicial;
+* seed administrativo;
+* Common Module;
+* Auth Module;
+* Users Module;
+* Health checks;
+* Tenant Context con AsyncLocalStorage;
+* guards de autenticación y autorización;
+* response/error wrappers;
+* logging con redacción de datos sensibles;
+* contrato OpenAPI/Swagger;
+* pruebas unitarias, E2E y scripts de validación;
+* documentación normativa reconciliada con ADR-004 y registro F4.
+
+A partir de este punto, Ángel puede comenzar trabajo sobre el frontend Flutter y la integración contra el Platform Backend, tomando como referencia:
+
+* `README.md`;
+* `MODULE-DEVELOPMENT.md`;
+* `Docs/ADRs/ADR-004-CommonBaseline.md`;
+* `Docs/DocsTeam/FormularioDeDecisiones/FormularioDecisionesFase4.md`;
+* `Docs/Contracts/platform-api.v1.yaml`;
+* Swagger en `/api/docs`;
+* los endpoints implementados de Auth, Users y Health.
+
+
+## 20. Veredicto actualizado
+
+**F4 CLOSED AS BASELINE / READY FOR FUNCTIONAL DEVELOPMENT**
+
+La Fase 4 queda cerrada como baseline técnico y documental. Las credenciales locales utilizadas durante desarrollo no se consideran valores productivos ni definitivos; deberán rotarse antes de cualquier entorno compartido, staging o producción.
