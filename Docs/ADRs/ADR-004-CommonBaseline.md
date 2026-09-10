@@ -1,5 +1,7 @@
 # ADR-004 — Implementación de infraestructura transversal y módulos base
 
+> **Gobierno F4 cerrado:** este ADR es la autoridad consolidada del baseline. Las decisiones anteriores compatibles se conservan; cualquier texto de F1/F2/F3 que contradiga este documento queda superseded y debe adaptarse. La secuencia normativa es: F4 CLOSED -> decisiones finales consolidadas -> documentación anterior adaptada -> implementación alineada.
+
 **Estado:** ACEPTADO / CERRADO
 **Fase:** Fase 4 — Implementación de infraestructura y baseline
 **Fecha:** 2026-09-09
@@ -109,22 +111,18 @@ Por lo tanto, la infraestructura desarrollada en F4 deberá evitar que los futur
 Para la implementación se establece la siguiente jerarquía:
 
 ```text
-1. Modelo Prisma
-        ↓
-2. ADRs de arquitectura
-        ↓
-3. OpenAPI
-        ↓
-4. ADR-004
-        ↓
-5. Guías de implementación
-        ↓
-6. Código
+1. ADR-004: decisiones F4 cerradas
+2. Registro de decisiones Fase 4
+3. Prisma y migraciones alineados con F4
+4. OpenAPI/Swagger alineados con F4
+5. Código y tests alineados con F4
+6. Documentación anterior reconciliada
+7. Planes, handoffs y auditorías como evidencia histórica
 ```
 
 Esta jerarquía no autoriza a ocultar contradicciones.
 
-Si una fuente de mayor prioridad resulta incompatible con otra, la inconsistencia deberá ser identificada y resuelta mediante una decisión explícita.
+Si F1/F2/F3 o la implementación contradicen F4, se aplica F4 y se reconcilia la fuente anterior. Solo decisiones nuevas no resueltas por F4 requieren validación humana.
 
 El código no podrá utilizarse como mecanismo para ocultar o reinterpretar una contradicción arquitectónica.
 
@@ -256,7 +254,7 @@ No serán simples carpetas vacías.
 
 Su objetivo es proporcionar un esqueleto NestJS real para la siguiente fase de implementación.
 
-No se crearán READMEs independientes para cada módulo.
+Excepción autorizada por Carlos: se conservan los READMEs locales de tenants, campaigns, prospects, prospecting-jobs y prospector-client como contexto subordinado a este ADR.
 
 La documentación general estará centralizada en:
 
@@ -267,6 +265,8 @@ MODULE-DEVELOPMENT.md
 ---
 
 # 8. `main.ts`
+
+Swagger sirve el YAML Platform en `/api/docs`; utiliza el origen actual como servidor y conserva `/api/v1` en las rutas. Los contratos funcionales F5+ no implican endpoints implementados en F4.
 
 `main.ts` será responsable exclusivamente del bootstrap y de la configuración transversal.
 
@@ -1329,6 +1329,8 @@ La implementación concreta podrá utilizar un Guard o mecanismo equivalente sie
 
 # 45. Users
 
+Precisión respaldada por el plan ejecutado, bloque 5: roleId es opcional al crear usuario y se resuelve a MEMBER del tenant operativo. ADMIN debe seleccionar tenant antes del CRUD tenant-scoped (403 si falta); Auth permite operaciones globales sin tenant. DELETE devuelve 200 con `{ success: true, data: {} }` y solo desactiva.
+
 Users será responsable de:
 
 * CRUD de usuarios;
@@ -1569,7 +1571,7 @@ La documentación deberá cubrir:
 * pruebas;
 * restricciones para agentes de IA.
 
-No se crearán READMEs independientes para los módulos funcionales vacíos.
+Se conservan los cinco READMEs locales por la excepción de la sección 7. AGENTS/ no es requisito del cierre F4.
 
 ---
 
@@ -1650,7 +1652,7 @@ Si durante la implementación un agente encuentra una contradicción real entre:
 * ADR;
 * requerimiento;
 
-deberá detenerse.
+aplicará F4 cuando ya resuelva la contradicción; solo detendrá la parte que requiera una nueva decisión arquitectónica.
 
 El reporte deberá incluir:
 
@@ -1664,7 +1666,7 @@ El reporte deberá incluir:
 7. Recomendación
 ```
 
-Después deberá esperar validación del desarrollador.
+Solo las decisiones nuevas requieren validación del desarrollador; las correcciones autorizadas conforme a F4 continúan.
 
 No podrá resolver una contradicción arquitectónica mediante una modificación silenciosa.
 
@@ -1845,6 +1847,8 @@ Los checkpoints permanecerán bajo control del desarrollador.
 
 # 61. Criterios de aceptación
 
+La lista siguiente define criterios normativos, no resultados ejecutados. La evidencia y el veredicto se registran en `Docs/Auditorias/Fase4-Auditoria-Profunda-PostCodex.md`. Cerrar decisiones no certifica automáticamente su implementación.
+
 F4 se considerará implementada cuando se cumplan los criterios siguientes.
 
 ## Proyecto
@@ -1959,6 +1963,8 @@ F4 se considerará implementada cuando se cumplan los criterios siguientes.
 ---
 
 # 62. Entregables de F4
+
+El Implementation Plan fue un artefacto externo ejecutado; no es obligatorio versionarlo para cerrar F4. La copia disponible está en `Docs/Auditorias/PlanDeImplementacionFase4.md`. Aporta intención y trazabilidad, subordinada a este ADR y al registro F4.
 
 Los entregables mínimos serán:
 

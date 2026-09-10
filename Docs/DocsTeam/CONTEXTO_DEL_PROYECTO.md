@@ -1,6 +1,6 @@
 # Contexto del Proyecto — Sistema SaaS de Prospección y Gestión de Campañas
 
-Las decisiones vigentes de implementación del baseline del Platform Backend están formalizadas en `Docs/ADRs/ADR-004-ImplementacionModulosCommonYBaseline.md`, que constituye la fuente de verdad para la Fase 4.
+Las decisiones vigentes de implementación del baseline del Platform Backend están formalizadas en `Docs/ADRs/ADR-004-CommonBaseline.md`, que constituye la fuente de verdad para la Fase 4.
 
 ## 1. Contexto académico
 

@@ -107,7 +107,7 @@ export class UsersService {
       this.prisma.user.findMany({
         where,
         include: userInclude,
-        orderBy: { name: 'asc' },
+        orderBy: { [pagination.sortBy]: pagination.sortOrder },
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit,
       }),
@@ -236,16 +236,18 @@ export class UsersService {
             tenantId: currentMembership.role.tenantId,
           }
         : null,
-      tenants: user.userTenants.map(({ tenant, role }) => ({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        tenantSlug: tenant.slug,
-        role: {
-          id: role.id,
-          name: role.name,
-          tenantId: role.tenantId,
-        },
-      })),
+      tenants: user.userTenants
+        .filter(({ tenantId }) => tenantId === currentTenantId)
+        .map(({ tenant, role }) => ({
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          tenantSlug: tenant.slug,
+          role: {
+            id: role.id,
+            name: role.name,
+            tenantId: role.tenantId,
+          },
+        })),
       status: user.status,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

@@ -1,5 +1,7 @@
 # Auditoría de Consistencia Documental — Fase 4
 
+> Análisis histórico reconciliado con F4. Las tablas de estados y opciones anteriores describen su fase de elaboración, no el cierre operativo actual. ADR-004 y el registro F4 prevalecen: ADMIN global, OWNER/MEMBER en UserTenant.roleId, JWT snapshot sin consulta de membership por request, AsyncLocalStorage, 11 variables obligatorias. Evidencia actual: Docs/Auditorias/Fase4-Auditoria-Profunda-PostCodex.md. READMEs locales autorizados; AGENTS opcional; plan externo ejecutado.
+
 ## Resumen Ejecutivo
 
 **Estado general:** INCONSISTENTE — Se requiere actualización documental antes del Sprint 1.
@@ -62,8 +64,8 @@
 | ID | Severidad | Documento | Ubicación | Decisión actual F4 | Contenido anterior | Problema | Acción requerida |
 |----|-----------|-----------|-----------|-------------------|--------------------|----------|------------------|
 | 16 | **F** | ADR-004 | — | Documento baseline | — | ADR-004 es fuente de verdad. | Sin cambios. |
-| 17 | **B** | FormularioDecisioneParaFase4.md | §35 "Pendientes que NO deberían reabrirse" | Roles: OWNER, MEMBER, ADMIN global | "OWNER/MEMBER para usuarios tenant. ADMIN global." | Compatible. | Sin acción. |
-| 18 | **F** | FormularioDecisioneParaFase4.md | §4 "F4-02 — Estructura" | Estructura definida | — | Compatible. | Sin acción. |
+| 17 | **B** | FormularioDecisionesFase4.md | §35 "Pendientes que NO deberían reabrirse" | Roles: OWNER, MEMBER, ADMIN global | "OWNER/MEMBER para usuarios tenant. ADMIN global." | Compatible. | Sin acción. |
+| 18 | **F** | FormularioDecisionesFase4.md | §4 "F4-02 — Estructura" | Estructura definida | — | Compatible. | Sin acción. |
 
 ---
 
@@ -194,7 +196,7 @@ enum RoleName {
 
 ---
 
-### ADR-003-SeguridadAutenticacionComponentesTransversales.md (ALTA)
+### ADR-003-AuthSecureTransversal.md (ALTA)
 
 **Secciones a modificar:**
 
@@ -282,7 +284,7 @@ constituye la fuente de verdad para el baseline del Platform Backend.
 | Fase2_ContratoAPI.md | Compatible. Contrato ya separado de modelo Prisma. |
 | Fase4_ImplementacionModulosCommonYBaseline.md | Fuente de verdad actual. Sin cambios. |
 | ADR-004 | Fuente de verdad actual. Sin cambios. |
-| FormularioDecisioneParaFase4.md | Contiene las respuestas que generaron ADR-004. Compatible. |
+| FormularioDecisionesFase4.md | Contiene las respuestas que generaron ADR-004. Compatible. |
 | README.md | General, compatible. |
 | DistribucionResponsabilidadesEquipo.md | Compatible. |
 | RoadMapTentativo.md | Compatible. |
@@ -329,7 +331,7 @@ constituye la fuente de verdad para el baseline del Platform Backend.
 |-----------|-------|
 | ADR-004 | Fuente de verdad actual. No debe duplicarse. |
 | Fase4_ImplementacionModulosCommonYBaseline.md | Es el análisis de ADR-004. Compatible. |
-| FormularioDecisioneParaFase4.md | Registro histórico. Contiene decisiones que generaron ADR-004. |
+| FormularioDecisionesFase4.md | Registro histórico. Contiene decisiones que generaron ADR-004. |
 | prospector-service-api.v1.yaml | No involucra roles/usuarios. |
 | README.md | General. Puede permanecer. |
 | DistribucionResponsabilidadesEquipo.md | Compatible. |
@@ -442,7 +444,7 @@ Para el Sprint 1, establecer las siguientes fuentes de verdad:
 ### Fuentes primarias (LEER OBLIGATORIAMENTE)
 
 ```text
-1. ADR-004-ImplementacionModulosCommonYBaseline.md
+1. ADR-004-CommonBaseline.md
    → Baseline, decisiones congeladas, estructura esperada
 
 2. Docs/Contracts/platform-api.v1.yaml
@@ -464,7 +466,7 @@ Para el Sprint 1, establecer las siguientes fuentes de verdad:
 6. ADR-002-ContratoAPI.md
    → Decisiones de contratos (actualizado)
 
-7. ADR-003-SeguridadAutenticacionComponentesTransversales.md
+7. ADR-003-AuthSecureTransversal.md
    → Seguridad y autorización (actualizado)
 ```
 
@@ -551,8 +553,8 @@ PERO: Debe reportar la contradicción antes de continuar
 | ID | Severidad | Documento | Ubicación | Decisión actual F4 | Contenido anterior | Estado | Resolución |
 |----|-----------|-----------|-----------|-------------------|--------------------|--------|------------|
 | 16 | **F** | ADR-004 | — | Documento baseline | — | ✅ **PROTEGIDO** | Sin cambios. |
-| 17 | **B** | FormularioDecisioneParaFase4.md | §35 "Pendientes que NO deberían reabrirse" | Roles: OWNER, MEMBER, ADMIN global | "OWNER/MEMBER para usuarios tenant. ADMIN global." | ✅ **SIN CAMBIOS** | Compatible. |
-| 18 | **F** | FormularioDecisioneParaFase4.md | §4 "F4-02 — Estructura" | Estructura definida | — | ✅ **PROTEGIDO** | Sin cambios. |
+| 17 | **B** | FormularioDecisionesFase4.md | §35 "Pendientes que NO deberían reabrirse" | Roles: OWNER, MEMBER, ADMIN global | "OWNER/MEMBER para usuarios tenant. ADMIN global." | ✅ **SIN CAMBIOS** | Compatible. |
+| 18 | **F** | FormularioDecisionesFase4.md | §4 "F4-02 — Estructura" | Estructura definida | — | ✅ **PROTEGIDO** | Sin cambios. |
 
 ---
 
@@ -653,7 +655,7 @@ model UserTenant {
 - **§5**: Modelo ER actualizado.
 - **§7**: BR-USER-006 aclarado; agregado BR-ROLE-007 para ADMIN global.
 
-### ADR-003-SeguridadAutenticacionComponentesTransversales.md ✅
+### ADR-003-AuthSecureTransversal.md ✅
 
 - **§2.6**: Roles redefinidos como OWNER/MEMBER tenant-scoped, ADMIN global.
 - **§3 (F3-02)**: Claims JWT especificados: platformRole, tenantId, tenantRole.
@@ -703,7 +705,7 @@ model UserTenant {
 |-----------|-------|
 | ADR-004 | Fuente de verdad actual. No debe duplicarse. |
 | Fase4_ImplementacionModulosCommonYBaseline.md | Análisis de ADR-004. Compatible. |
-| FormularioDecisioneParaFase4.md | Registro histórico. Contiene decisiones que generaron ADR-004. |
+| FormularioDecisionesFase4.md | Registro histórico. Contiene decisiones que generaron ADR-004. |
 | prospector-service-api.v1.yaml | No involucra roles de usuario. |
 | README.md | General. Compatible. |
 | DistribucionResponsabilidadesEquipo.md | Compatible. |
@@ -771,7 +773,7 @@ model UserTenant {
 ### Fuentes primarias (LEER OBLIGATORIAMENTE)
 
 ```text
-1. ADR-004-ImplementacionModulosCommonYBaseline.md
+1. ADR-004-CommonBaseline.md
    → Baseline, decisiones congeladas, estructura esperada
 
 2. Docs/Contracts/platform-api.v1.yaml
@@ -793,7 +795,7 @@ model UserTenant {
 6. ADR-002-ContratoAPI.md (actualizado)
    → Decisiones de contratos
 
-7. ADR-003-SeguridadAutenticacionComponentesTransversales.md (actualizado)
+7. ADR-003-AuthSecureTransversal.md (actualizado)
    → Seguridad y autorización
 ```
 

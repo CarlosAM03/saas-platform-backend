@@ -1,16 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as bcrypt from 'bcrypt';
+import { Prisma, User, Role, UserTenant, Tenant } from '@prisma/client';
 
 export interface FakePrismaState {
-  users: any[];
-  tenants: any[];
-  roles: any[];
-  userTenants: any[];
+  users: User[];
+  tenants: Pick<Tenant, 'id' | 'name' | 'slug' | 'status'>[];
+  roles: Pick<Role, 'id' | 'tenantId' | 'name' | 'description'>[];
+  userTenants: UserTenant[];
 }
 
 const now = new Date('2026-09-09T00:00:00.000Z');
 
-export async function createFakePrisma(): Promise<any> {
+export async function createFakePrisma() {
   const ownerPassword = await bcrypt.hash('SecurePass123!', 4);
   const memberPassword = await bcrypt.hash('SecurePass123!', 4);
   const inactivePassword = await bcrypt.hash('SecurePass123!', 4);
@@ -141,192 +141,214 @@ export async function createFakePrisma(): Promise<any> {
     ],
   };
 
-  const findTenant = (id: string) =>
-    state.tenants.find((tenant) => tenant.id === id);
-  const findRole = (id: string) => state.roles.find((role) => role.id === id);
-  const hydrateUser = (user: any) => ({
-    ...user,
-    userTenants: state.userTenants
-      .filter((membership) => membership.userId === user.id)
-      .map((membership) => ({
-        ...membership,
-        tenant: findTenant(membership.tenantId),
-        role: findRole(membership.roleId),
-      })),
-  });
-  const findUser = (where: any) => {
-    if (where.id) return state.users.find((user) => user.id === where.id);
-    if (where.email)
-      return state.users.find((user) => user.email === where.email);
-    return undefined;
+  type Where = {
+    id?: string;
+    email?: string;
+    tenantId?: string;
+    status?: string;
+    userTenants?: { some?: { tenantId?: string } };
+    OR?: Array<Partial<Record<'name' | 'email', { contains: string }>>>;
   };
-  const matchesTenant = (user: any, tenantId: string) =>
-    state.userTenants.some(
-      (membership) =>
-        membership.userId === user.id && membership.tenantId === tenantId,
+  type UserArgs = {
+    where: Where;
+    include?: unknown;
+    select?: unknown;
+    skip?: number;
+    take?: number;
+    orderBy?: Partial<Record<keyof User, 'asc' | 'desc'>>;
+  };
+  const findTenant = (id: string) => state.tenants.find((t) => t.id === id)!;
+  const findRole = (id: string) => state.roles.find((r) => r.id === id)!;
+  const hydrateMembership = (m: UserTenant) => ({
+    ...m,
+    tenant: findTenant(m.tenantId),
+    role: findRole(m.roleId),
+  });
+  const hydrateUser = (u: User) => ({
+    ...u,
+    userTenants: state.userTenants
+      .filter((m) => m.userId === u.id)
+      .map(hydrateMembership),
+  });
+  const matches = (u: User, w: Where) =>
+    (!w.id || u.id === w.id) &&
+    (!w.email || u.email === w.email) &&
+    (!w.userTenants?.some?.tenantId ||
+      state.userTenants.some(
+        (m) =>
+          m.userId === u.id && m.tenantId === w.userTenants?.some?.tenantId,
+      )) &&
+    (!w.OR ||
+      w.OR.some((c) =>
+        Object.entries(c).some(([k, v]) =>
+          String(u[k as keyof User])
+            .toLowerCase()
+            .includes(v.contains.toLowerCase()),
+        ),
+      ));
+  const findUser = (w: Where) => state.users.find((u) => matches(u, w));
+  type MembershipArgs = {
+    where: { userId_tenantId: { userId: string; tenantId: string } };
+    include?: unknown;
+  };
+  const findMembership = ({ where }: MembershipArgs) =>
+    state.userTenants.find(
+      (m) =>
+        m.userId === where.userId_tenantId.userId &&
+        m.tenantId === where.userId_tenantId.tenantId,
     );
-
-  const prisma: any = {
+  const prisma = {
     _state: state,
-    $connect: async () => undefined,
-    $disconnect: async () => undefined,
-    $queryRaw: async () => [{ '?column?': 1 }],
-    $transaction: async (operation: any) => {
-      if (Array.isArray(operation)) return Promise.all(operation);
-      return operation(prisma);
-    },
+    $connect: () => Promise.resolve(),
+    $disconnect: () => Promise.resolve(),
+    $queryRaw: () => Promise.resolve([{ value: 1 }]),
     user: {
-      findUnique: async ({ where }: any) => {
-        const user = findUser(where);
-        return user ? hydrateUser(user) : null;
+      findUnique: ({ where }: UserArgs) => {
+        const u = findUser(where);
+        return u ? hydrateUser(u) : null;
       },
-      findUniqueOrThrow: async ({ where }: any) => {
-        const user = findUser(where);
-        if (!user) throw new Error('User not found');
-        return hydrateUser(user);
+      findUniqueOrThrow: ({ where }: UserArgs) => {
+        const u = findUser(where);
+        if (!u) throw new Error('User not found');
+        return hydrateUser(u);
       },
-      findFirst: async ({ where }: any) => {
-        const user = state.users.find((candidate) => {
-          if (where.id && candidate.id !== where.id) return false;
-          if (
-            where.userTenants?.some?.tenantId &&
-            !matchesTenant(candidate, where.userTenants.some.tenantId)
-          ) {
-            return false;
-          }
-          if (
-            where.OR &&
-            !where.OR.some((condition: any) => {
-              const [field, filter] = Object.entries(condition)[0] as [
-                string,
-                any,
-              ];
-              return candidate[field]
-                .toLowerCase()
-                .includes(filter.contains.toLowerCase());
-            })
-          )
-            return false;
-          return true;
-        });
-        return user ? hydrateUser(user) : null;
+      findFirst: ({ where }: UserArgs) => {
+        const u = findUser(where);
+        return u ? hydrateUser(u) : null;
       },
-      findMany: async ({ where }: any) =>
-        state.users
-          .filter(
-            (user) =>
-              !where.userTenants?.some?.tenantId ||
-              matchesTenant(user, where.userTenants.some.tenantId),
-          )
-          .filter(
-            (user) =>
-              !where.OR ||
-              where.OR.some((condition: any) => {
-                const [field, filter] = Object.entries(condition)[0] as [
-                  string,
-                  any,
-                ];
-                return user[field]
-                  .toLowerCase()
-                  .includes(filter.contains.toLowerCase());
-              }),
-          )
-          .map(hydrateUser)
-          .slice(
-            where.skip ?? 0,
-            (where.skip ?? 0) + (where.take ?? state.users.length),
-          ),
-      count: async ({ where }: any) =>
-        state.users.filter(
-          (user) =>
-            !where.userTenants?.some?.tenantId ||
-            matchesTenant(user, where.userTenants.some.tenantId),
-        ).length,
-      create: async ({ data }: any) => {
-        if (state.users.some((user) => user.email === data.email)) {
-          const error: any = new Error('Unique constraint');
-          error.code = 'P2002';
-          throw error;
-        }
-        const user = {
-          id: `user-${state.users.length + 1}`,
+      findMany: ({
+        where,
+        skip = 0,
+        take = state.users.length,
+        orderBy,
+      }: UserArgs) => {
+        const users = state.users.filter((u) => matches(u, where));
+        const [key, direction] = Object.entries(orderBy ?? { name: 'asc' })[0];
+        users.sort(
+          (a, b) =>
+            String(a[key as keyof User]).localeCompare(
+              String(b[key as keyof User]),
+            ) * (direction === 'desc' ? -1 : 1),
+        );
+        return users.slice(skip, skip + take).map(hydrateUser);
+      },
+      count: ({ where }: UserArgs) =>
+        state.users.filter((u) => matches(u, where)).length,
+      create: ({
+        data,
+      }: {
+        data: Pick<User, 'name' | 'email' | 'passwordHash'>;
+      }) => {
+        if (state.users.some((u) => u.email === data.email))
+          throw new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+            code: 'P2002',
+            clientVersion: 'test',
+          });
+        const u: User = {
+          id: 'user-' + (state.users.length + 1),
           ...data,
           platformRole: null,
           status: 'ACTIVO',
           createdAt: now,
           updatedAt: now,
         };
-        state.users.push(user);
-        return hydrateUser(user);
+        state.users.push(u);
+        return hydrateUser(u);
       },
-      update: async ({ where, data }: any) => {
-        const user = findUser(where);
-        if (!user) throw new Error('User not found');
-        Object.entries(data).forEach(([key, value]) => {
-          if (value !== undefined) user[key] = value;
-        });
-        user.updatedAt = now;
-        return hydrateUser(user);
+      update: ({ where, data }: { where: Where; data: Partial<User> }) => {
+        const u = findUser(where);
+        if (!u) throw new Error('User not found');
+        Object.assign(
+          u,
+          Object.fromEntries(
+            Object.entries(data).filter(([, v]) => v !== undefined),
+          ),
+          { updatedAt: now },
+        );
+        return hydrateUser(u);
       },
     },
     userTenant: {
-      create: async ({ data }: any) => {
-        state.userTenants.push({ ...data, joinedAt: now });
-        return data;
+      create: ({
+        data,
+      }: {
+        data: Omit<UserTenant, 'joinedAt'>;
+        include?: unknown;
+      }) => {
+        const m = { ...data, joinedAt: now };
+        state.userTenants.push(m);
+        return hydrateMembership(m);
       },
-      findUnique: async ({ where }: any) =>
-        state.userTenants.find(
-          (item) =>
-            item.userId === where.userId_tenantId.userId &&
-            item.tenantId === where.userId_tenantId.tenantId,
-        ) ?? null,
-      update: async ({ where, data }: any) => {
-        const item = state.userTenants.find(
-          (membership) =>
-            membership.userId === where.userId_tenantId.userId &&
-            membership.tenantId === where.userId_tenantId.tenantId,
-        );
-        if (!item) throw new Error('Membership not found');
-        Object.assign(item, data);
-        return item;
+      findUnique: (args: MembershipArgs) => {
+        const m = findMembership(args);
+        return m ? hydrateMembership(m) : null;
       },
-      findMany: async ({ where }: any) =>
+      update: (args: MembershipArgs & { data: Partial<UserTenant> }) => {
+        const m = findMembership(args);
+        if (!m) throw new Error('Membership not found');
+        Object.assign(m, args.data);
+        return hydrateMembership(m);
+      },
+      findMany: ({
+        where,
+      }: {
+        where: {
+          userId: string;
+          tenantId?: string;
+          tenant?: { status: string };
+        };
+        include?: unknown;
+        orderBy?: unknown;
+      }) =>
         state.userTenants
-          .filter((item) => item.userId === where.userId)
-          .map((item) => ({
-            ...item,
-            tenant: findTenant(item.tenantId),
-            role: findRole(item.roleId),
-          })),
+          .filter(
+            (m) =>
+              m.userId === where.userId &&
+              (!where.tenantId || m.tenantId === where.tenantId),
+          )
+          .map(hydrateMembership)
+          .filter(
+            (m) =>
+              !where.tenant?.status || m.tenant.status === where.tenant.status,
+          ),
     },
     role: {
-      findUnique: async ({ where }: any) =>
-        state.roles.find(
-          (role) =>
-            role.id === where.id ||
-            (role.tenantId === where.tenantId_name.tenantId &&
-              role.name === where.tenantId_name.name),
+      findUnique: ({
+        where,
+      }: {
+        where: {
+          id?: string;
+          tenantId_name?: { tenantId: string; name: string };
+        };
+      }) =>
+        state.roles.find((r) =>
+          where.id
+            ? r.id === where.id
+            : r.tenantId === where.tenantId_name?.tenantId &&
+              r.name === where.tenantId_name?.name,
         ) ?? null,
-      findFirst: async ({ where }: any) =>
+      findFirst: ({ where }: { where: Where }) =>
         state.roles.find(
-          (role) =>
-            (!where.id || role.id === where.id) &&
-            (!where.tenantId || role.tenantId === where.tenantId),
+          (r) =>
+            (!where.id || r.id === where.id) &&
+            (!where.tenantId || r.tenantId === where.tenantId),
         ) ?? null,
-      findMany: async ({ where }: any) =>
+      findMany: ({ where }: { where: Where }) =>
         state.roles.filter(
-          (role) => !where?.tenantId || role.tenantId === where.tenantId,
+          (r) => !where.tenantId || r.tenantId === where.tenantId,
         ),
     },
     tenant: {
-      findFirst: async ({ where }: any) =>
+      findFirst: ({ where }: { where: Where }) =>
         state.tenants.find(
-          (tenant) =>
-            (!where?.id || tenant.id === where.id) &&
-            (!where?.status || tenant.status === where.status),
+          (t) =>
+            (!where.id || t.id === where.id) &&
+            (!where.status || t.status === where.status),
         ) ?? null,
     },
   };
-
-  return prisma;
+  return Object.assign(prisma, {
+    $transaction: <T>(operation: T[] | ((transaction: typeof prisma) => T)) =>
+      Array.isArray(operation) ? Promise.all(operation) : operation(prisma),
+  });
 }

@@ -6,12 +6,21 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { Request } from 'express';
+import { PinoLogger } from 'nestjs-pino';
+import { TenantContextService } from '../context/tenant-context.service';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
+  constructor(
+    private readonly logger: PinoLogger,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
+    const request = context.getRequest<Request & { requestId?: string }>();
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
@@ -43,11 +52,30 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       ? { messages: message }
       : (responseBody?.details ?? {});
 
+    this.logger.warn(
+      {
+        requestId: request.requestId,
+        method: request.method,
+        path: (request.route as { path?: string } | undefined)?.path,
+        statusCode: status,
+        userId: this.tenantContext.getContext()?.userId,
+        tenantId: this.tenantContext.getContext()?.tenantId,
+        ip: request.ip,
+        userAgent: request.get('user-agent'),
+      },
+      'request rejected',
+    );
+
     response.status(status).json({
       success: false,
       error: {
         code: codeByStatus[status] ?? `HTTP_${status}`,
-        message,
+        message:
+          status >= 500
+            ? 'Internal server error'
+            : Array.isArray(message)
+              ? 'Validation failed'
+              : message,
         details,
         timestamp: new Date().toISOString(),
       },

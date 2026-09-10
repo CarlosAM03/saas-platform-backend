@@ -2,7 +2,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { TenantContextService } from '../../common/context/tenant-context.service';
 import { UsersService } from '../../users/users.service';
 
 export interface JwtClaims {
@@ -20,16 +19,34 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
     private readonly usersService: UsersService,
-    private readonly tenantContext: TenantContextService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
+      algorithms: ['HS256'],
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
 
   async validate(payload: JwtClaims) {
+    if (
+      typeof payload.sub !== 'string' ||
+      !payload.sub ||
+      typeof payload.email !== 'string' ||
+      ![null, 'ADMIN'].includes(payload.platformRole) ||
+      !(
+        payload.tenantId === null ||
+        (typeof payload.tenantId === 'string' && payload.tenantId.length > 0)
+      ) ||
+      ![null, 'OWNER', 'MEMBER'].includes(payload.tenantRole) ||
+      (payload.tenantId === null && payload.tenantRole !== null) ||
+      (payload.platformRole === 'ADMIN' && payload.tenantRole !== null) ||
+      (payload.platformRole === null &&
+        payload.tenantId !== null &&
+        payload.tenantRole === null)
+    ) {
+      throw new UnauthorizedException('Invalid authorization context');
+    }
     const user = await this.usersService.findByIdForAuthentication(payload.sub);
 
     if (!user || user.status !== 'ACTIVO') {
@@ -45,14 +62,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantId: payload.tenantId,
       tenantRole: payload.tenantRole,
     };
-    this.tenantContext.setContext({
-      userId: authenticatedUser.id,
-      email: authenticatedUser.email,
-      platformRole: authenticatedUser.platformRole,
-      tenantId: authenticatedUser.tenantId,
-      tenantRole: authenticatedUser.tenantRole,
-    });
-
     return authenticatedUser;
   }
 }

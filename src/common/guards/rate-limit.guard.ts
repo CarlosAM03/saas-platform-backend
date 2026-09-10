@@ -22,13 +22,7 @@ export class RateLimitGuard implements CanActivate {
       ip?: string;
       headers: Record<string, string | string[] | undefined>;
     }>();
-    const forwardedFor = request.headers['x-forwarded-for'];
-    const clientIp =
-      (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor)
-        ?.split(',')[0]
-        .trim() ??
-      request.ip ??
-      'unknown';
+    const clientIp = request.ip ?? 'unknown';
     const now = Date.now();
     const current = this.attempts.get(clientIp);
 

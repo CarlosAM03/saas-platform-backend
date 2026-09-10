@@ -20,6 +20,14 @@ async function main(): Promise<void> {
   });
 
   if (existingAdmin) {
+    if (
+      existingAdmin.platformRole !== 'ADMIN' ||
+      existingAdmin.status !== 'ACTIVO'
+    ) {
+      throw new Error(
+        'Existing seed account is not an active global ADMIN; review the account explicitly.',
+      );
+    }
     console.log(`ADMIN already exists: ${adminEmail}`);
   } else {
     const passwordHash = await bcrypt.hash(adminPassword, 12);
@@ -69,8 +77,10 @@ async function main(): Promise<void> {
 }
 
 main()
-  .catch((error: unknown) => {
-    console.error('Seed failed:', error);
+  .catch(() => {
+    console.error(
+      'Seed failed; verify configuration, database availability and the seed account.',
+    );
     process.exitCode = 1;
   })
   .finally(async () => {

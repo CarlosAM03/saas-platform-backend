@@ -1,5 +1,7 @@
 # ADR-003 — Seguridad, Autenticación y Componentes Transversales
 
+> **Alineación F4:** ADR-004-CommonBaseline.md es la decisión vigente para el baseline. El JWT es un snapshot de autorización (`sub`, `tenantId`, `platformRole`, `tenantRole`); no se consulta `UserTenant` en cada request únicamente para reconstruir el rol. Cualquier redacción histórica de este ADR que exija esa revalidación por request queda superseded por F4.
+
 ## Estado
 
 CERRADO
@@ -297,7 +299,7 @@ tenantRole
 
 para permitir una autorización sencilla y eficiente.
 
-Sin embargo, la pertenencia efectiva del usuario al tenant será validada mediante `UserTenant`.
+La pertenencia se valida mediante UserTenant al iniciar sesión o seleccionar tenant. En requests posteriores se usa el snapshot JWT y se comprueba identidad activa, firma y expiración (ADR-004 §31).
 
 La base de datos continuará siendo responsable de garantizar que:
 
@@ -323,7 +325,7 @@ JWT
  └── tenantRole
 ```
 
-Para validar la pertenencia efectiva al tenant:
+Al emitir un JWT mediante login/select-tenant se valida la pertenencia:
 
 ```text
 JWT
@@ -341,7 +343,7 @@ El aislamiento de datos seguirá dependiendo de `tenantId`.
 
 ## Justificación
 
-Este modelo evita introducir consultas adicionales innecesarias para obtener el rol en cada request, manteniendo la simplicidad del MVP, pero conserva una validación persistente de la relación usuario-tenant.
+Este modelo evita introducir consultas adicionales innecesarias para obtener el rol en cada request, manteniendo la simplicidad del MVP, con validación persistente de la relación al emitir contexto, no en cada request.
 
 ## Consecuencias
 
@@ -350,14 +352,14 @@ Este modelo evita introducir consultas adicionales innecesarias para obtener el 
 * Arquitectura sencilla.
 * Menor cantidad de consultas para autorización basada en rol.
 * El contexto del tenant está disponible desde el JWT.
-* La pertenencia al tenant puede invalidarse inmediatamente mediante la base de datos.
+* Los cambios de membresía/rol se reflejan al emitir nuevo contexto; la desactivación global del usuario se comprueba por request.
 * Compatible con el modelo multi-tenant existente.
 
 ### Negativas
 
 Un cambio de rol puede no reflejarse en un JWT ya emitido hasta su expiración, salvo que se implemente posteriormente un mecanismo adicional de invalidación o revalidación.
 
-La pertenencia al tenant, en cambio, deberá seguir siendo validada.
+La pertenencia sigue la misma política snapshot; no se consulta UserTenant por request.
 
 ## Alcance
 
@@ -442,29 +444,17 @@ Un `ADMIN` global puede autenticarse sin registros en `UserTenant` y sin tenant 
 
 ## Pertenencia eliminada o desactivada
 
-Si el usuario deja de pertenecer a un tenant:
-
-```text
-UserTenant
-↓
-relación inactiva/inexistente
-↓
-acceso rechazado
-```
-
-La expiración del JWT no otorga por sí misma autorización para continuar operando sobre el tenant.
-
-La aplicación podrá cerrar la sesión del usuario cuando detecte la pérdida de acceso.
+F4 supersede la revocación inmediata por membership: los tokens emitidos conservan su snapshot hasta expirar; nuevos login/select-tenant consultan la relación vigente. Un usuario globalmente INACTIVO se rechaza por request.
 
 ## Suspensión del tenant
 
-Si el tenant deja de estar disponible o se encuentra suspendido, las operaciones correspondientes deberán ser rechazadas conforme al estado del tenant.
+Login y select-tenant rechazan tenants suspendidos. F4 no agrega revalidación transversal de UserTenant por request.
 
 ## Manipulación del tenantId
 
 El cliente no podrá seleccionar arbitrariamente un `tenantId` para obtener acceso.
 
-El tenant deberá formar parte del contexto autenticado y validarse contra `UserTenant`, salvo el caso de un `ADMIN` global operando sin tenant seleccionado.
+El tenant proviene del snapshot autenticado; al seleccionarlo se valida UserTenant o autoridad global ADMIN.
 
 ## Justificación
 
@@ -597,7 +587,7 @@ Los servicios y/o repositorios que trabajen con información multi-tenant deber�
 
 El `tenantId` utilizado para las operaciones no deberá depender de un valor arbitrario enviado por el cliente.
 
-El contexto será derivado del JWT. Para usuarios tenant-scoped se validará mediante `UserTenant`; un `ADMIN` global puede operar sin pertenecer a ningún tenant.
+El contexto se deriva del JWT validado. UserTenant se consulta al emitir contexto; ADMIN global puede operar sin membership.
 
 ## Principio
 
@@ -1154,14 +1144,14 @@ La arquitectura de seguridad de Fase 3 queda definida de la siguiente manera:
                     │ role                      │
                     └────────────┬────────────┘
                                  │
-                          UserTenant
+               Snapshot JWT autenticado
                          validation
                                  │
                                  ▼
                     ┌─────────────────────────┐
                     │       RolesGuard         │
                     │                           │
-                    │ OWNER / MEMBER / ADMIN   │
+                    │ tenantRole / platformRole│
                     └────────────┬────────────┘
                                  │
                                  ▼
@@ -1238,7 +1228,7 @@ Selección de tenant
    ↓
 POST /auth/select-tenant
    ↓
-Validación UserTenant
+Snapshot JWT validado (UserTenant al emitir contexto)
    ↓
 Nuevo JWT
    ├── sub
@@ -1261,7 +1251,7 @@ La implementación de Fase 3 deberá respetar los siguientes principios:
 
 2. El `tenantId` utilizado para autorización debe provenir del contexto autenticado.
 
-3. La relación `UserTenant` debe validar la pertenencia efectiva del usuario al tenant.
+3. UserTenant valida la pertenencia al emitir contexto en login/select-tenant, no por request.
 
 4. Toda operación de datos multi-tenant debe respetar el aislamiento por `tenantId`.
 

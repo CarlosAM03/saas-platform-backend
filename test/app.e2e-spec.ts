@@ -11,11 +11,16 @@ describe('AppController (e2e)', () => {
 
   beforeEach(async () => {
     process.env.NODE_ENV = 'test';
+    process.env.PORT = '3000';
     process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
     process.env.JWT_SECRET = 'test-secret';
     process.env.JWT_EXPIRES_IN = '8h';
+    process.env.PROSPECTOR_SERVICE_URL = 'http://localhost:8000';
     process.env.PROSPECTOR_API_KEY = 'test-key';
     process.env.CORS_ORIGINS = 'http://localhost:4200';
+    process.env.ADMIN_NAME = 'Test Admin';
+    process.env.ADMIN_EMAIL = 'admin@test.example';
+    process.env.ADMIN_PASSWORD = 'SecurePass123!';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -33,6 +38,6 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Hello World!');
+      .expect('Está vivo, ESTÁ VIVO!');
   });
 });
