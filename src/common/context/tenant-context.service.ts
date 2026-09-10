@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export type TenantRole = 'OWNER' | 'MEMBER' | null;
@@ -14,18 +14,28 @@ export interface TenantContext {
 
 @Injectable()
 export class TenantContextService {
-  private readonly storage = new AsyncLocalStorage<TenantContext>();
+  private readonly storage = new AsyncLocalStorage<{
+    context?: TenantContext;
+  }>();
+
+  runRequest<T>(callback: () => T): T {
+    return this.storage.run({}, callback);
+  }
 
   setContext(context: TenantContext): void {
-    this.storage.enterWith({ ...context });
+    const scope = this.storage.getStore();
+    if (!scope || scope.context) {
+      throw new Error('Authentication context requires a fresh request scope');
+    }
+    scope.context = { ...context };
   }
 
   run<T>(context: TenantContext, callback: () => T): T {
-    return this.storage.run({ ...context }, callback);
+    return this.storage.run({ context: { ...context } }, callback);
   }
 
   getContext(): TenantContext | undefined {
-    const context = this.storage.getStore();
+    const context = this.storage.getStore()?.context;
     return context ? { ...context } : undefined;
   }
 
@@ -51,7 +61,7 @@ export class TenantContextService {
   requireTenantId(): string {
     const tenantId = this.getRequiredContext().tenantId;
     if (!tenantId) {
-      throw new Error('A tenant context is required for this operation');
+      throw new ForbiddenException('Select a tenant before this operation');
     }
 
     return tenantId;

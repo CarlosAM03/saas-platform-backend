@@ -23,6 +23,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       useFactory: (configService: ConfigService): JwtModuleOptions => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
+          algorithm: 'HS256',
           expiresIn: configService.getOrThrow<string>(
             'JWT_EXPIRES_IN',
           ) as JwtModuleOptions['signOptions'] extends {

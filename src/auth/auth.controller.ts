@@ -1,12 +1,20 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { Request } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { RateLimitGuard } from '../common/guards/rate-limit.guard';
 import { AuthService } from './auth.service';
 import { LoginRequest } from './dto/login.request';
 import { SelectTenantRequest } from './dto/select-tenant.request';
-import { Roles } from '../common/decorators/roles.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: { id: string };
@@ -19,6 +27,7 @@ export class AuthController {
   @Public()
   @UseGuards(RateLimitGuard)
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   login(@Body() request: LoginRequest) {
     return this.authService
       .validateUser(request.email, request.password)
@@ -26,14 +35,14 @@ export class AuthController {
   }
 
   @Post('logout')
-  @UseGuards(RateLimitGuard)
+  @HttpCode(HttpStatus.OK)
   logout(@Req() request: AuthenticatedRequest) {
     this.authService.logout(request.user.id);
-    return { message: 'Logout successful' };
+    return {};
   }
 
   @Post('select-tenant')
-  @UseGuards(RateLimitGuard)
+  @HttpCode(HttpStatus.OK)
   selectTenant(
     @Req() request: AuthenticatedRequest,
     @Body() body: SelectTenantRequest,
@@ -42,8 +51,10 @@ export class AuthController {
   }
 
   @Get('me')
-  @Roles('ADMIN', 'OWNER', 'MEMBER')
-  getMe(@CurrentUser() user: { id: string }) {
-    return this.authService.getMe(user.id);
+  getMe(@CurrentUser() user: { id: string }, @Req() request: Request) {
+    return this.authService.getMe(
+      user.id,
+      request.headers.authorization!.split(' ')[1],
+    );
   }
 }

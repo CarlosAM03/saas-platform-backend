@@ -1,5 +1,7 @@
 # API V1 Audit
 
+> **Trazabilidad histórica F2 reconciliada:** este documento no certifica el cierre operativo F4. La evidencia vigente se registra en `../Auditorias/Fase4-Auditoria-Profunda-PostCodex.md`; ADR-004 y el registro F4 gobiernan.
+
 ## Estado general
 
 **DEFINIDA.** Se generó una especificación OpenAPI V1 utilizable para trabajo paralelo entre Flutter, Platform Backend y Prospector Service. ADR-002, aceptado y fechado el 7 de septiembre de 2026, se tomó como fuente normativa para el contrato.
@@ -9,8 +11,8 @@
 - `Docs/ADRs/ADR-002-ContratoAPI.md`, fuente principal del contrato y decisión más reciente.
 - `Docs/ADRs/ADR-001-DecisionesDeDominioMVP.md`, decisiones de dominio y multi-tenancy.
 - `Docs/ADRs/ADR_Responsabilidades_Postgre.md`, límites de PostgreSQL y aislamiento.
-- `Docs/Fase2_ContratoAPI.md`, catálogo, payloads y matriz de decisiones.
-- `Docs/Fase1_DOMAIN.md`, entidades, relaciones y lifecycle inicial.
+- `Docs/Analisis/Fase2_ContratoAPI.md`, catálogo, payloads y matriz de decisiones.
+- `Docs/Analisis/Fase1_DOMAIN.md`, entidades, relaciones y lifecycle inicial.
 - `Prisma/schema.prisma`, fuente de verdad de persistencia.
 - `README.md`, contexto y límites del backend.
 
@@ -56,9 +58,9 @@
 
 ## Decisiones postergadas
 
-- Refresh tokens, expiración y revocación JWT.
+- Resuelto en F4: HS256, 8h, sin refresh token ni blacklist; snapshot JWT.
 - Rotación y mecanismo físico definitivo de API Keys, especialmente callback.
-- Rate limiting.
+- Resuelto en F4: login 5/60s/IP en memoria.
 - RLS/policies PostgreSQL.
 - Estrategia concreta de cache y TTL de resultados.
 - Reintentos de callbacks, timeout operativo y cancelación física del Service/Engine.
@@ -88,7 +90,7 @@ No se agregaron columnas, relaciones ni entidades persistentes. La unicidad usad
 
 ## Cambios recomendados para V2
 
-- Formalizar tenant context y claims del JWT sin permitir selección arbitraria fuera de membresías.
+- Resuelto en F4: claims sub, email, platformRole, tenantId, tenantRole y selección mediante membership o ADMIN global.
 - Definir versionado/rotación de credenciales internas y políticas de reintento de callback.
 - Establecer contrato de TTL/cache y una política explícita para `results` expirados.
 - Formalizar filtros por recurso y columnas de exportación.

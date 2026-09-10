@@ -1,5 +1,7 @@
 # AUDITORÍA FINAL DE FASE 3 Y DELIMITACIÓN DE FASE 4
 
+> Análisis histórico reconciliado con F4. Las tablas de estados y opciones anteriores describen su fase de elaboración, no el cierre operativo actual. ADR-004 y el registro F4 prevalecen: ADMIN global, OWNER/MEMBER en UserTenant.roleId, JWT snapshot sin consulta de membership por request, AsyncLocalStorage, 11 variables obligatorias. Evidencia actual: Docs/Auditorias/Fase4-Auditoria-Profunda-PostCodex.md. READMEs locales autorizados; AGENTS opcional; plan externo ejecutado.
+
 ## 1. Veredicto ejecutivo
 
 ```text
@@ -103,7 +105,7 @@ Usuario
 **Orden de ejecución:**
 
 ```text
-Request → Global AuthGuard → @Public()? → (si no) JWT validation → TenantContext → UserTenant validation → RolesGuard → @Roles() → Controller
+Request → Global AuthGuard → @Public()? → (si no) JWT validation → TenantContext (snapshot JWT) → RolesGuard → @Roles() → Controller
 ```
 
 **Validación conceptual:**
@@ -113,7 +115,7 @@ Request → Global AuthGuard → @Public()? → (si no) JWT validation → Tenan
 | **Global AuthGuard** | Validar JWT y extraer claims. | Sí. | ✅ |
 | **@Public()** | Marcar endpoints sin autenticación. | Sí. | ✅ |
 | **TenantContext** | Almacenar userId, tenantId, platformRole y tenantRole del contexto autenticado. | Sí. | ✅ |
-| **UserTenant validation** | Validar pertenencia del usuario al tenant. | Sí. | ✅ |
+| **UserTenant validation** | Validar pertenencia al emitir contexto (login/select-tenant). | No por request. | F4 supersede F3 |
 | **RolesGuard** | Verificar rol contra @Roles(). | Sí. | ✅ |
 
 **Conclusión:** La arquitectura es conceptualmente sólida y se puede implementar sin contradicciones. Los detalles de implementación (AsyncLocalStorage, inyección de contexto) se resuelven en F4.

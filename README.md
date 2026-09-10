@@ -2,11 +2,11 @@
 
 Backend principal de la plataforma SaaS para gestion de campanas de marketing y prospeccion automatizada.
 
-Este repositorio contiene la documentacion global y el proyecto NestJS en `saas-platform-backend/`. El backend expone la Platform API, aplica autenticacion y autorizacion, mantiene el contexto tenant, persiste datos con Prisma y coordina servicios internos.
+Este repositorio contiene el proyecto NestJS en la raiz. El backend expone la Platform API, aplica autenticacion y autorizacion, mantiene el contexto tenant, persiste datos con Prisma y coordina servicios internos.
 
 > **Estado:** Baseline Fase 4 implementado y preparado para desarrollo funcional.
 > **Alcance actual:** Common, Auth, Users, Prisma, Health y modulos funcionales preparados.
-> **Fuente de verdad:** ADR-004, OpenAPI y `saas-platform-backend/Prisma/schema.prisma`.
+> **Fuente de verdad:** ADR-004, registro F4, Prisma/migraciones y OpenAPI alineados.
 
 ---
 
@@ -182,9 +182,10 @@ Se requiere:
 
 El servidor conecta Prisma durante el arranque. Si PostgreSQL no esta configurado, `npm run start:dev` no podra iniciar correctamente.
 
-Desde `saas-platform-backend/`:
+Desde la raiz del repositorio:
 
 ```powershell
+# Solo si .env no existe; completar sus valores antes de arrancar.
 Copy-Item .env.example .env
 npm install
 npm run prisma:generate
@@ -213,38 +214,31 @@ No se deben subir `.env`, passwords, JWT, API keys ni secretos.
 
 ## 7. Estructura actual del proyecto
 
-La estructura propuesta para el MVP es:
+La estructura del repositorio es:
 
 ```text
-    saas-platform-backend/
-   │
-   ├── main.ts
-   │
-   ├── app.module.ts
-   │
-   ├── common/
-   ├── auth/
-   ├── users/
-   ├── prisma/
-   ├── tenants/
-   ├── campaigns/
-   ├── prospects/
-   ├── prospecting-jobs/
-   |── prospector-client/
-   │
-   ├── Prisma/schema.prisma
-   │
-   ├── test/
-   │
-   ├── .env.example
-   ├── package.json
-   ├── tsconfig.json
-   ├── nest-cli.json
-   ├── MODULE-DEVELOPMENT.md
-   ├── README.md
+saas-platform-backend/
+├── src/
+│   ├── main.ts
+│   ├── app.module.ts
+│   ├── common/
+│   ├── auth/
+│   ├── users/
+│   ├── prisma/
+│   ├── tenants/
+│   ├── campaigns/
+│   ├── prospects/
+│   ├── prospecting-jobs/
+│   └── prospector-client/
+├── Prisma/ (schema.prisma, migrations/, seed.ts)
+├── test/
+├── scripts/
+├── Docs/
+├── .env.example
+├── package.json
+├── MODULE-DEVELOPMENT.md
+└── README.md
 ```
-
-La estructura es una **propuesta inicial**. Los módulos y responsabilidades podrán cambiar conforme se definan los requerimientos funcionales del sistema.
 `Common`, `Auth`, `Users` y `Prisma` contienen infraestructura implementada. `Tenants`, `Campaigns`, `Prospects`, `ProspectingJobs` y `ProspectorClient` son esqueletos NestJS preparados para la siguiente fase.
 ---
 
@@ -278,13 +272,13 @@ Gestiona CRUD de usuarios, `UserTenant`, roles `OWNER/MEMBER` y desactivacion lo
 
 Cada modulo tiene un README local con su contexto, endpoints y dependencias:
 
-- [Tenants](saas-platform-backend/src/tenants/README.md)
-- [Campaigns](saas-platform-backend/src/campaigns/README.md)
-- [Prospects](saas-platform-backend/src/prospects/README.md)
-- [Prospecting Jobs](saas-platform-backend/src/prospecting-jobs/README.md)
-- [Prospector Client](saas-platform-backend/src/prospector-client/README.md)
+- [Tenants](src/tenants/README.md)
+- [Campaigns](src/campaigns/README.md)
+- [Prospects](src/prospects/README.md)
+- [Prospecting Jobs](src/prospecting-jobs/README.md)
+- [Prospector Client](src/prospector-client/README.md)
 
-La guia general para Ángel y agentes IA es [MODULE-DEVELOPMENT.md](saas-platform-backend/MODULE-DEVELOPMENT.md).
+La guia general para Ángel y agentes IA es [MODULE-DEVELOPMENT.md](MODULE-DEVELOPMENT.md).
 
 ---
 
@@ -370,7 +364,7 @@ La estrategia de multitenencia actualmente definida es:
 
 Las entidades que requieran aislamiento deberán incorporar la relación correspondiente con el tenant.
 
-El modelo vigente esta en [Prisma/schema.prisma](saas-platform-backend/Prisma/schema.prisma). `User.platformRole` representa ADMIN global; `UserTenant.roleId` representa OWNER/MEMBER por tenant. No existe system tenant.
+El modelo vigente esta en [Prisma/schema.prisma](Prisma/schema.prisma). `User.platformRole` representa ADMIN global; `UserTenant.roleId` representa OWNER/MEMBER por tenant. No existe system tenant.
 
 ---
 
@@ -410,11 +404,11 @@ Las pruebas E2E usan Jest y Supertest. El servidor normal requiere PostgreSQL co
 
 - [ADR-001: dominio MVP](Docs/ADRs/ADR-001-DecisionesDeDominioMVP.md)
 - [ADR-002: contrato API](Docs/ADRs/ADR-002-ContratoAPI.md)
-- [ADR-003: seguridad y autenticacion](Docs/ADRs/ADR-003-SeguridadAutenticacionComponentesTransversales.md)
-- [ADR-004: baseline F4](Docs/ADRs/ADR-004-ImplementacionModulosCommonYBaseline.md)
+- [ADR-003: seguridad y autenticacion](Docs/ADRs/ADR-003-AuthSecureTransversal.md)
+- [ADR-004: baseline F4](Docs/ADRs/ADR-004-CommonBaseline.md)
 - [Contrato Platform API V1](Docs/Contracts/platform-api.v1.yaml)
 - [Auditoria API V1](Docs/Contracts/API_V1_AUDIT.md)
-- [Schema Prisma](saas-platform-backend/Prisma/schema.prisma)
+- [Schema Prisma](Prisma/schema.prisma)
 
 Si el codigo, contrato, schema o documentacion se contradicen, se debe detener la implementacion y reportar la diferencia conforme a `MODULE-DEVELOPMENT.md`.
 
@@ -444,7 +438,7 @@ El baseline queda preparado para que Angel continue con la implementacion funcio
 - Codigo fuente completo de `saas-platform-backend/`.
 - Common, Auth, Users, Prisma y Health implementados.
 - Modulos vacios preparados: Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient.
-- [README principal](README.md) y [MODULE-DEVELOPMENT.md](saas-platform-backend/MODULE-DEVELOPMENT.md).
+- [README principal](README.md) y [MODULE-DEVELOPMENT.md](MODULE-DEVELOPMENT.md).
 - Cinco READMEs locales con contexto y dependencias de cada modulo.
 - Contratos [Platform API V1](Docs/Contracts/platform-api.v1.yaml) y [Prospector Service API V1](Docs/Contracts/prospector-service-api.v1.yaml).
 - Prisma schema, PrismaService y seed idempotente para ADMIN global.
@@ -499,3 +493,11 @@ Flutter se desarrolla fuera de este repositorio y consume la Platform API defini
 ### Mensaje de handoff
 
 > El baseline F4 de Platform Backend esta implementado con NestJS, Common, Auth, Users, Prisma, Health, JWT, RBAC, TenantContext y modulos funcionales preparados. Angel puede comenzar la implementacion de dominio leyendo ADR-004, OpenAPI, Prisma, `MODULE-DEVELOPMENT.md` y el README local del modulo. Antes de ejecutar el servidor debe configurar PostgreSQL y `DATABASE_URL`; despues debe completar y verificar las pruebas E2E, implementar los modulos funcionales y conectar Prospector Service sin modificar las decisiones transversales congeladas.
+
+## Verificación de reconciliación F4
+
+El veredicto y la evidencia están en [Auditoría profunda](Docs/Auditorias/Fase4-Auditoria-Profunda-PostCodex.md). El cierre de ADR-004 corresponde a decisiones arquitectónicas; no sustituye las pruebas.
+
+Swagger: http://localhost:3000/api/docs; API: http://localhost:3000/api/v1 (puerto según PORT). Auth login/logout/select-tenant devuelven 200. ADMIN inicia sin tenant; el CRUD Users requiere seleccionar uno. roleId es opcional al crear usuario (default MEMBER). JWT_EXPIRES_IN debe ser 8h.
+
+Validación local controlada: `node scripts/f4-local-validation.cjs start` y `node scripts/f4-local-validation.cjs start:dev`. Usa PostgreSQL real y retira fixtures por sus IDs exactos. Las pruebas aisladas mantienen AsyncLocalStorage real y sustituyen solo Prisma. Los cinco READMEs de módulos se conservan; AGENTS/ es opcional. El plan externo ejecutado no es un requisito de versionado.

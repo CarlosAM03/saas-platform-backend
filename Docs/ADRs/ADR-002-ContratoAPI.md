@@ -266,11 +266,10 @@ Role
 - updatedAt
 ```
 
-Los roles disponibles son:
+Los roles tenant-scoped disponibles son (ADMIN pertenece a User.platformRole):
 
 ```text
 OWNER
-ADMIN
 MEMBER
 ```
 
@@ -1340,7 +1339,9 @@ En particular:
 
 ---
 
-# 32. Seguridad diferida a Fase 3
+# 32. Seguridad diferida a Fase 3 — registro histórico superseded
+
+F4 resolvió: HS256, expiración 8h, sin refresh token ni blacklist, rate limit login 5/60s/IP y contexto JWT snapshot. El listado siguiente conserva la planificación original, no pendientes vigentes.
 
 Quedan para Fase 3:
 

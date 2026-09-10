@@ -15,7 +15,12 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node Prisma/seed.ts",
+    "test:f4:local": "node test/scripts/f4-local-validation.cjs",
+    "test:f4:db": "node test/scripts/f4-database-validation.cjs"
+  },
+  "prisma": {
+    "schema": "Prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

@@ -12,7 +12,7 @@ Este directorio contiene el contrato HTTP V1 de la plataforma. Los YAML son la r
 
 Flutter solo consume Platform API mediante `Authorization: Bearer <JWT>`. Flutter no llama directamente a Prospector Service. Platform es dueño del estado persistente de `ProspectingJob`, de los resultados temporales y de la decisión de persistir o exportar.
 
-Platform llama a Prospector Service con `X-API-Key`. El Service llama al callback interno de Platform con `X-API-Key`. La API Key concreta, su rotación y la política operativa de seguridad quedan postergadas a Fase 3.
+Platform llama a Prospector Service con `X-API-Key`. El Service llama al callback interno de Platform con `X-API-Key`. La clave concreta proviene del entorno; rotación operativa e implementación de integración quedan fuera del baseline F4.
 
 ## Tenant y persistencia
 
@@ -24,7 +24,9 @@ Los recursos API son DTOs. `passwordHash` nunca se expone. `BusinessResult`, `Pi
 
 La versión se expresa en la ruta (`/api/v1`). Cambios incompatibles deben publicarse bajo `/api/v2`; cambios compatibles pueden añadir propiedades opcionales, estados de metadatos o nuevos endpoints tras actualizar la trazabilidad. Antes de cambiar un DTO, actualizar ADR-002 y este directorio, y comprobar el mapping hacia Prisma.
 
-La V1 evita fijar refresh tokens, expiración o revocación de JWT, rate limiting, rotación de claves, RLS, TTL/cache concreto, reintentos, timeout operativo y mecanismo físico de cancelación. Esos puntos están documentados como postergados y no deben inferirse del YAML.
+F4 fija JWT HS256 de 8h, sin refresh token ni blacklist, y rate limiting de login 5/60s/IP. El JWT es snapshot; UserTenant se valida al emitir contexto. RLS, TTL/cache, reintentos y cancelación física están fuera del baseline.
+
+Swagger carga platform-api.v1.yaml en /api/docs, con servidor relativo al origen actual. F4 implementa Auth, Users y Health; los demás endpoints conservan su contrato objetivo. meta es opcional, logout y DELETE Users devuelven data: {}. ADMIN es global; OWNER/MEMBER son tenant-scoped. ADR-004 y el registro F4 gobiernan.
 
 ## Nota de compatibilidad
 

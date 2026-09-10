@@ -1,5 +1,7 @@
 # Fase 2 — Contrato API V1
 
+> Análisis histórico reconciliado con F4. Las tablas de estados y opciones anteriores describen su fase de elaboración, no el cierre operativo actual. ADR-004 y el registro F4 prevalecen: ADMIN global, OWNER/MEMBER en UserTenant.roleId, JWT snapshot sin consulta de membership por request, AsyncLocalStorage, 11 variables obligatorias. Evidencia actual: Docs/Auditorias/Fase4-Auditoria-Profunda-PostCodex.md. READMEs locales autorizados; AGENTS opcional; plan externo ejecutado.
+
 ## Análisis documental exhaustivo basado en las fuentes del proyecto
 
 ---

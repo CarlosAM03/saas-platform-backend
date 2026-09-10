@@ -1,7 +1,19 @@
 import { Type } from 'class-transformer';
-import { IsInt, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class PaginationDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsIn(['name', 'email', 'status', 'createdAt', 'updatedAt'])
+  sortBy: 'name' | 'email' | 'status' | 'createdAt' | 'updatedAt' = 'name';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder: 'asc' | 'desc' = 'asc';
+
   @Type(() => Number)
   @IsInt()
   @Min(1)

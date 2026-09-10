@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -42,6 +43,8 @@ export class UsersController {
   @Patch(':id')
   @Roles('OWNER', 'ADMIN')
   update(@Param('id') id: string, @Body() request: UpdateUserRequest) {
+    if (Object.keys(request).length === 0)
+      throw new BadRequestException('At least one field is required');
     return this.usersService.update(id, request);
   }
 

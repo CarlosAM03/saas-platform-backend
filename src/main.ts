@@ -7,7 +7,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { SwaggerModule } from '@nestjs/swagger';
+import { OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 
@@ -41,12 +41,9 @@ async function bootstrap() {
     './Docs/Contracts/platform-api.v1.yaml',
     'utf8',
   );
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  const document = yaml.load(openApiYaml) as any;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  document.servers = [{ url: 'http://localhost:3000' }];
+  const document = yaml.load(openApiYaml) as OpenAPIObject;
+  document.servers = [{ url: '/' }];
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   SwaggerModule.setup('api/docs', app, document, {
     customSiteTitle: 'SaaS Platform API',
     swaggerOptions: {

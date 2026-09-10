@@ -6,7 +6,17 @@
 **Fase:** Fase 4 — Implementación de infraestructura y baseline
 **Propósito del documento:** Registro formal de respuestas, decisiones, restricciones y pendientes derivados del formulario de Fase 4.
 **Naturaleza:** Documento de registro y control de decisiones. No sustituye al ADR-004.
-**Estado:** En consolidación previa a implementación.
+**Estado:** Decisiones cerradas por ADR-004; verificación de implementación en la auditoría profunda.
+
+## Consolidación vigente F4
+
+ADR-004 prevalece. Los estados parciales del formulario original que se conserva abajo son históricos, superseded por F4-C01–C07, no decisiones pendientes actuales. Common usa @nestjs/config (11 variables de ADR-004 §11), PrismaService singleton, AsyncLocalStorage y consultas tenant-aware explícitas sin middleware Prisma ni Repository obligatorio. ADMIN es global; RoleName solo OWNER/MEMBER; UserTenant.roleId reemplaza User.roleId. JWT HS256 de 8h como snapshot, sin consultas de membership por request.
+
+Se conserva la excepción autorizada de cinco READMEs locales; AGENTS no es obligatorio. El Implementation Plan externo fue ejecutado, no se exige dentro del repo y ahora existe copia en Docs/Auditorias/PlanDeImplementacionFase4.md. roleId opcional/default MEMBER está respaldado por su bloque 5 y consolidado en ADR-004 §45. Auth POST responde 200; CRUD Users opera sobre tenant seleccionado. Swagger sirve /api/docs.
+
+## Formulario original — evidencia histórica
+
+Las decisiones compatibles se conservan; las opciones abiertas, pendientes y restricciones contradictorias de este registro original no gobiernan sobre la consolidación anterior.
 
 ---
 
@@ -242,7 +252,7 @@ JWT_SECRET
 JWT_EXPIRES_IN
 PROSPECTOR_SERVICE_URL
 PROSPECTOR_API_KEY
-CORS_ORIGIN
+CORS_ORIGINS
 ```
 
 Además, deberán existir variables para las credenciales iniciales del usuario administrador global utilizado por el seed.
@@ -1574,7 +1584,7 @@ Los reportes deberán ser suficientemente legibles para una persona.
 ## Documentación
 
 * [ ] Documentación actualizada.
-* [ ] Implementation Plan.
+* [x] No existe un artefacto separado obligatorio de Implementation Plan; el plan conceptual queda integrado en ADR-004 y este registro.
 * [ ] Module Development Guide.
 * [ ] Handoff.
 * [ ] Criterios de aceptación verificados.

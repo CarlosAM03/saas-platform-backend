@@ -4,10 +4,10 @@ Guia principal para Angel y agentes IA que implementen modulos funcionales sobre
 
 ## Orden de lectura
 
-1. [ADR-004](../Docs/ADRs/ADR-004-ImplementacionModulosCommonYBaseline.md), decisiones transversales.
-2. [OpenAPI Platform V1](../Docs/Contracts/platform-api.v1.yaml), contrato publico.
+1. [ADR-004](Docs/ADRs/ADR-004-CommonBaseline.md), decisiones transversales.
+2. [OpenAPI Platform V1](Docs/Contracts/platform-api.v1.yaml), contrato publico.
 3. [Prisma schema](Prisma/schema.prisma), modelo persistente.
-4. [ADR-003](../Docs/ADRs/ADR-003-SeguridadAutenticacionComponentesTransversales.md), seguridad.
+4. [ADR-003](Docs/ADRs/ADR-003-AuthSecureTransversal.md), seguridad.
 5. Este documento.
 6. README local del modulo.
 
@@ -198,3 +198,15 @@ No ocultar contradicciones con casts, campos inventados, tenants ficticios o cam
 - [Prospects](src/prospects/README.md)
 - [Prospecting Jobs](src/prospecting-jobs/README.md)
 - [Prospector Client](src/prospector-client/README.md)
+
+- documentacion tecnica: ✅ Server running on http://localhost:3000 📄 Swagger UI: http://localhost:3000/api/docs
+
+ API base: http://localhost:3000/api/v1
+
+## Precisiones F4 de ejecución
+
+La jerarquía empieza por ADR-004 y el registro F4. Middleware abre un alcance AsyncLocalStorage por request; AuthGuard lo completa una sola vez tras verificar JWT. Los Services consumen el contexto, nunca lo escriben. UserTenant se valida en login/select-tenant; las requests usan el snapshot y verifican usuario activo. No sustituir este contexto por un objeto global en los tests.
+
+Auth/me permite identidad sin tenant seleccionado y devuelve el token presentado sin renovarlo. Users requiere tenant incluso para ADMIN; roleId omitido se resuelve a MEMBER. El requestId se crea antes de guards para cubrir errores 401/403. Evitar logs de headers, cuerpos, query strings y valores sensibles.
+
+Las correcciones conforme a F4 no requieren reabrir decisiones anteriores. Solo una nueva decisión arquitectónica requiere escalar la parte afectada.

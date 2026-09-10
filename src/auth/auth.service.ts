@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { PinoLogger } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
+import { UserTenantService } from '../users/services/user-tenant.service';
 import { PasswordService } from './password.service';
 import {
   AuthContextResponse,
@@ -16,17 +17,10 @@ import {
   AuthUserResponse,
 } from './dto/auth.response';
 
-const userWithTenants = {
-  userTenants: {
-    include: {
-      tenant: true,
-      role: true,
-    },
-  },
-} satisfies Prisma.UserInclude;
-
 type UserWithTenants = Prisma.UserGetPayload<{
-  include: typeof userWithTenants;
+  include: {
+    userTenants: { include: { tenant: true; role: true } };
+  };
 }>;
 
 type AuthenticatedUser = Pick<
@@ -47,6 +41,7 @@ type AuthenticatedUser = Pick<
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly userTenantService: UserTenantService,
     private readonly jwtService: JwtService,
     private readonly passwordService: PasswordService,
     private readonly tenantContext: TenantContextService,
@@ -57,12 +52,10 @@ export class AuthService {
     email: string,
     password: string,
   ): Promise<AuthenticatedUser> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: userWithTenants,
-    });
+    const user = await this.userTenantService.findUserByEmail(email);
 
     if (!user || user.status !== 'ACTIVO') {
+      this.logger.warn({ email, outcome: 'failure' }, 'login failed');
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -71,6 +64,7 @@ export class AuthService {
       user.passwordHash,
     );
     if (!validPassword) {
+      this.logger.warn({ email, outcome: 'failure' }, 'login failed');
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -82,6 +76,7 @@ export class AuthService {
       ({ tenant }) => tenant.status === 'ACTIVO',
     );
     if (user.platformRole !== 'ADMIN' && activeTenants.length === 0) {
+      this.logger.warn({ userId: user.id, outcome: 'failure' }, 'login failed');
       throw new UnauthorizedException('User has no active tenant membership');
     }
     const selectedTenant =
@@ -96,6 +91,10 @@ export class AuthService {
       selectedTenant?.role.name ?? null,
     );
 
+    this.logger.info(
+      { userId: user.id, outcome: 'success' },
+      'login succeeded',
+    );
     return {
       accessToken,
       user: this.toUserResponse(user),
@@ -109,9 +108,9 @@ export class AuthService {
     tenantId: string,
   ): Promise<AuthContextResponse> {
     const user = await this.findUser(userId);
-    const membership = user.userTenants.find(
-      ({ tenant, tenantId: memberTenantId }) =>
-        memberTenantId === tenantId && tenant.status === 'ACTIVO',
+    const membership = await this.userTenantService.findActiveMembership(
+      userId,
+      tenantId,
     );
 
     if (!membership && user.platformRole !== 'ADMIN') {
@@ -147,14 +146,12 @@ export class AuthService {
     };
   }
 
-  async getMe(userId: string): Promise<AuthContextResponse> {
+  async getMe(
+    userId: string,
+    accessToken: string,
+  ): Promise<AuthContextResponse> {
     const user = await this.findUser(userId);
     const context = this.tenantContext.getContext();
-    const accessToken = await this.createToken(
-      user,
-      context?.tenantId ?? null,
-      context?.tenantRole ?? null,
-    );
 
     return {
       accessToken,
@@ -171,10 +168,7 @@ export class AuthService {
   }
 
   private async findUser(userId: string): Promise<AuthenticatedUser> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: userWithTenants,
-    });
+    const user = await this.userTenantService.findUserById(userId);
     if (!user || user.status !== 'ACTIVO') {
       throw new UnauthorizedException('User is inactive or does not exist');
     }
@@ -192,7 +186,7 @@ export class AuthService {
       email: user.email,
       platformRole: user.platformRole === 'ADMIN' ? 'ADMIN' : null,
       tenantId,
-      tenantRole,
+      tenantRole: user.platformRole === 'ADMIN' ? null : tenantRole,
     });
   }
 

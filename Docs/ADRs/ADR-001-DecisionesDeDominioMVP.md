@@ -346,7 +346,7 @@ erDiagram
 - Se necesita un Guard que:
   1. Autentique al usuario.
   2. Resuelva el tenant activo de la sesión.
-    3. Cargue el rol del usuario para ese tenant desde `UserTenant.roleId`.
+  3. Lea tenantRole y platformRole del snapshot JWT validado (ADR-004). UserTenant.roleId se resuelve al emitir contexto, no en cada request.
   4. Inyecte el contexto de tenant y rol en la request.
 - Las validaciones de permisos (ej. solo ADMIN para eliminar físicamente) se implementan en los Services utilizando el rol resuelto.
 

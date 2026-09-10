@@ -1,6 +1,6 @@
 import {
   IsEmail,
-  IsOptional,
+  ValidateIf,
   IsString,
   Matches,
   MinLength,
@@ -24,7 +24,8 @@ export class CreateUserRequest {
   })
   password!: string;
 
-  @IsOptional()
+  @ValidateIf((_object, value: unknown) => value !== undefined)
   @IsString()
+  @MinLength(1)
   roleId?: string;
 }

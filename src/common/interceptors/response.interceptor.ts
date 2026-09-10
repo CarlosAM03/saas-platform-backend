@@ -23,7 +23,7 @@ export class ResponseInterceptor implements NestInterceptor {
           return { success: true, data: wrapped.data, meta: wrapped.meta };
         }
 
-        return { success: true, data, meta: undefined };
+        return { success: true, data: data ?? {}, meta: undefined };
       }),
     );
   }

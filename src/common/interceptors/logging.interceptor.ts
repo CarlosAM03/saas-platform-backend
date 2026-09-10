@@ -34,7 +34,7 @@ export class LoggingInterceptor implements NestInterceptor {
           {
             requestId: request.requestId,
             method: request.method,
-            path: request.originalUrl ?? request.url,
+            path: (request.route as { path?: string } | undefined)?.path,
             statusCode: response.statusCode,
             duration: Date.now() - startedAt,
             userId:
