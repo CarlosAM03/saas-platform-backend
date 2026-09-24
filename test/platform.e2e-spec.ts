@@ -94,6 +94,197 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
     expect(response.body.data.currentTenantId).toBe('tenant-a');
   });
 
+  it('exige autenticación en las tres rutas de Tenants', async () => {
+    const responses = await Promise.all([
+      request(app.getHttpServer()).get('/api/v1/tenants'),
+      request(app.getHttpServer()).get('/api/v1/tenants/tenant-a'),
+      request(app.getHttpServer())
+        .post('/api/v1/tenants')
+        .send({ name: 'New', slug: 'new' }),
+    ]);
+    for (const response of responses) {
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+      expect(response.headers['x-request-id']).toEqual(expect.any(String));
+    }
+  });
+
+  it('lista memberships sin tenant seleccionado y oculta organizaciones ajenas', async () => {
+    const multi = (await login('multi@example.com')).body.data.accessToken;
+    const owner = (await login('owner@example.com')).body.data.accessToken;
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/tenants')
+      .set('Authorization', `Bearer ${multi}`);
+    expect(list.status).toBe(200);
+    expect(list.body.data.map((tenant) => tenant.id)).toEqual([
+      'tenant-a',
+      'tenant-b',
+    ]);
+    const responses = await Promise.all([
+      request(app.getHttpServer())
+        .get('/api/v1/tenants')
+        .set('Authorization', `Bearer ${owner}`),
+      request(app.getHttpServer())
+        .get('/api/v1/tenants/tenant-b')
+        .set('Authorization', `Bearer ${owner}`),
+      request(app.getHttpServer())
+        .get('/api/v1/tenants/missing')
+        .set('Authorization', `Bearer ${owner}`),
+      request(app.getHttpServer())
+        .get('/api/v1/tenants/tenant-a')
+        .set('Authorization', `Bearer ${owner}`),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([
+      200, 404, 404, 200,
+    ]);
+    expect(responses[0].body.data.map((tenant) => tenant.id)).toEqual([
+      'tenant-a',
+    ]);
+    expect(Object.keys(responses[3].body.data).sort()).toEqual([
+      'createdAt',
+      'id',
+      'name',
+      'slug',
+      'status',
+      'updatedAt',
+    ]);
+  });
+
+  it('ADMIN consulta todos los tenants y un miembro solo los activos accesibles', async () => {
+    const member = (await login('member@example.com')).body.data.accessToken;
+    const admin = (await login('admin@example.com')).body.data.accessToken;
+    fake._state.tenants[0].status = 'SUSPENDIDO';
+    const memberList = await request(app.getHttpServer())
+      .get('/api/v1/tenants')
+      .set('Authorization', `Bearer ${member}`);
+    expect(memberList.body.data).toEqual([]);
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get('/api/v1/tenants/tenant-a')
+          .set('Authorization', `Bearer ${member}`)
+      ).status,
+    ).toBe(404);
+    const adminList = await request(app.getHttpServer())
+      .get('/api/v1/tenants')
+      .set('Authorization', `Bearer ${admin}`);
+    expect(adminList.status).toBe(200);
+    expect(adminList.body.data).toHaveLength(2);
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get('/api/v1/tenants/tenant-a')
+          .set('Authorization', `Bearer ${admin}`)
+      ).status,
+    ).toBe(200);
+  });
+
+  it.each(['owner@example.com', 'member@example.com'])(
+    'rechaza creación de tenants por %s',
+    async (email) => {
+      const token = (await login(email)).body.data.accessToken;
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/tenants')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Forbidden', slug: 'forbidden' });
+      expect(response.status).toBe(403);
+      expect(fake._state.tenants).toHaveLength(2);
+    },
+  );
+
+  it('ADMIN crea tenant con roles utilizables, sin convertirse en miembro', async () => {
+    const token = (await login('admin@example.com')).body.data.accessToken;
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/tenants')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'New Tenant', slug: 'new-tenant' });
+    expect(created.status).toBe(201);
+    expect(created.body).toEqual({
+      success: true,
+      data: {
+        id: expect.any(String) as unknown,
+        name: 'New Tenant',
+        slug: 'new-tenant',
+        status: 'ACTIVO',
+        createdAt: expect.any(String) as unknown,
+        updatedAt: expect.any(String) as unknown,
+      },
+    });
+    const tenantId = created.body.data.id;
+    expect(
+      fake._state.roles
+        .filter((role) => role.tenantId === tenantId)
+        .map((role) => role.name)
+        .sort(),
+    ).toEqual(['MEMBER', 'OWNER']);
+    expect(
+      fake._state.userTenants.some(
+        (membership) => membership.tenantId === tenantId,
+      ),
+    ).toBe(false);
+    const selected = await request(app.getHttpServer())
+      .post('/api/v1/auth/select-tenant')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ tenantId });
+    expect(selected.status).toBe(200);
+    const user = await request(app.getHttpServer())
+      .post('/api/v1/users')
+      .set('Authorization', `Bearer ${selected.body.data.accessToken}`)
+      .send({
+        name: 'First member',
+        email: 'new-member@example.com',
+        password: 'SecurePass123!',
+      });
+    expect(user.status).toBe(201);
+    expect(user.body.data.role).toMatchObject({ name: 'MEMBER', tenantId });
+    const duplicate = await request(app.getHttpServer())
+      .post('/api/v1/tenants')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Duplicate', slug: 'new-tenant' });
+    expect(duplicate.status).toBe(409);
+    expect(fake._state.tenants).toHaveLength(3);
+    expect(fake._state.roles).toHaveLength(6);
+  });
+
+  it.each([
+    {},
+    { name: 'Missing slug' },
+    { slug: 'missing-name' },
+    { name: null, slug: 'null-name' },
+    { name: 12, slug: 'number-name' },
+    { name: 'Null slug', slug: null },
+    { name: 'Number slug', slug: 12 },
+    { name: 'Injected tenant', slug: 'injected', tenantId: 'tenant-b' },
+    { name: 'Injected status', slug: 'injected', status: 'SUSPENDIDO' },
+    { name: 'Injected roles', slug: 'injected', roles: [] },
+  ])('rechaza CreateTenantRequest inválido: %j', async (body) => {
+    const token = (await login('admin@example.com')).body.data.accessToken;
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/tenants')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+    expect(response.status).toBe(400);
+    expect(fake._state.tenants).toHaveLength(2);
+  });
+
+  it('mantiene aisladas las consultas de tenants concurrentes', async () => {
+    const owner = (await login('owner@example.com')).body.data.accessToken;
+    const other = (await login('owner-b@example.com')).body.data.accessToken;
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        request(app.getHttpServer())
+          .get('/api/v1/tenants')
+          .set('Authorization', `Bearer ${i % 2 ? other : owner}`),
+      ),
+    );
+    responses.forEach((response, i) => {
+      expect(response.status).toBe(200);
+      expect(response.body.data.map((tenant) => tenant.id)).toEqual([
+        i % 2 ? 'tenant-b' : 'tenant-a',
+      ]);
+    });
+  });
+
   it('mantiene el snapshot del rol hasta emitir un nuevo JWT', async () => {
     const token = (await login('owner@example.com')).body.data.accessToken;
     fake._state.userTenants.find((m) => m.userId === 'user-owner')!.roleId =
