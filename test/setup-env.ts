@@ -3,7 +3,9 @@
 Object.assign(process.env, {
   NODE_ENV: 'test',
   PORT: '3000',
-  DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+  DATABASE_URL:
+    process.env.JOBS_TEST_DATABASE_URL ??
+    'postgresql://test:test@localhost:5432/test',
   JWT_SECRET: 'test-secret',
   JWT_EXPIRES_IN: '8h',
   PROSPECTOR_SERVICE_URL: 'http://localhost:8000',

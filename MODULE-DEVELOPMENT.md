@@ -193,7 +193,7 @@ No ocultar contradicciones con casts, campos inventados, tenants ficticios o cam
 
 ## Modulos preparados
 
-Estado del desarrollo funcional posterior a F4: **Tenants implementado** (listado, consulta y creacion administrativa, con pruebas E2E aisladas). Campaigns, Prospects, ProspectingJobs y ProspectorClient permanecen preparados para implementacion. El README local de cada modulo documenta su alcance actual.
+Estado del desarrollo funcional posterior a F4: **Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient implementados** para el MVP. ADR-005 registra las ampliaciones autorizadas de cancelacion e idempotencia persistente. Hay pruebas aisladas y una suite con PostgreSQL real (`test:jobs:db`). Los resultados/cursors temporales requieren una instancia; Python real se integra por el contrato interno. El README local de cada modulo documenta alcance y limites.
 
 - [Tenants](src/tenants/README.md)
 - [Campaigns](src/campaigns/README.md)

@@ -31,6 +31,28 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /api/v1/prospecting/jobs/{jobId}/cancel:
+    post:
+      tags: [Job Execution]
+      operationId: requestJobCancellation
+      summary: Solicita cancelar una ejecucion (ADR-005)
+      description: Idempotente. Devuelve 202 si acepta la solicitud o ya esta cancelada. El callback CANCELLED confirma la detencion; no cambia el estado persistente directamente.
+      security: [{ apiKeyAuth: [] }]
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/Cuid' }
+      responses:
+        '202':
+          description: Cancelacion solicitada o trabajo ya cancelado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /api/v1/internal/prospecting-jobs/{jobId}/events:
     post:
       tags: [Platform Callback]

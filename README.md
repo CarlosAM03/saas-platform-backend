@@ -8,7 +8,7 @@ Este repositorio contiene el proyecto NestJS en la raiz. El backend expone la Pl
 > **Alcance actual:** Common, Auth, Users, Prisma, Health y modulos funcionales preparados.
 > **Fuente de verdad:** ADR-004, registro F4, Prisma/migraciones y OpenAPI alineados.
 
-**Avance funcional posterior a F4:** Tenants ya implementa listado, consulta y creacion administrativa con roles OWNER/MEMBER y pruebas E2E aisladas. Los otros cuatro modulos funcionales siguen pendientes. Las secciones de baseline y handoff siguientes describen la entrega historica F4; consultar el [README de Tenants](src/tenants/README.md) para su estado actual.
+**Avance funcional posterior a F4:** Los cinco modulos estan implementados para el MVP: Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient. Jobs incluye idempotencia persistente, callbacks, cancelacion y exportacion CSV/XLSX. [ADR-005](Docs/ADRs/ADR-005-FunctionalJobs.md) registra las extensiones autorizadas y los limites de cache de una instancia. Las pruebas incluyen PostgreSQL real con el servicio Python sustituido; falta conectar el Python real del entorno. Aplicar las migraciones antes de iniciar. Las secciones de baseline y handoff siguientes son historicas; consultar los README locales para el estado funcional actual.
 
 ---
 

@@ -24,4 +24,10 @@ Gestionar prospectos persistidos y sus asociaciones con campanas dentro del tena
 
 Filtrar siempre por `tenantId` autenticado. Respetar la identidad `(tenantId, campaignId, source, sourceIdentifier)` y la diferencia entre `BusinessResult` temporal y `Prospect` persistido. No exponer `passwordHash` ni modelos Prisma sin mapping.
 
-La implementacion funcional queda fuera del baseline F4. Consultar `MODULE-DEVELOPMENT.md`.
+## Implementacion funcional
+
+Implementados GET /prospects, GET /prospects/:id y PATCH /prospects/:id. Requieren JWT y tenant seleccionado, incluso para ADMIN. OWNER/MEMBER pueden consultar y actualizar. Los filtros, paginacion y consultas se restringen al tenant autenticado. Campos omitidos se conservan; los nullable aceptan null; metadata null se guarda como SQL NULL. No se permite modificar tenant, campana de origen ni identificadores de fuente.
+
+`persistResults` es una operacion interna utilizada por Jobs, no una ruta publica. Guarda Prospect y CampaignProspect atomicamente, deduplica segun ADR-005 y reintenta conflictos de transacciones SERIALIZABLE. No sobrescribe datos ya editados por el usuario.
+
+Las pruebas PostgreSQL en `test/jobs.postgres-spec.ts` cubren rutas, permisos, aislamiento, validacion, metadata, persistencia repetida y concurrencia real. Consultar `MODULE-DEVELOPMENT.md` y ADR-005.
