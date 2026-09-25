@@ -46,3 +46,20 @@ Cache MVP: una sola instancia, TTL 24h desde la ultima actualizacion, maximo 100
 3. El servicio Python debe implementar inicio, cancelacion y callbacks segun el contrato interno actualizado.
 
 `npm run test:jobs:db` necesita JOBS_TEST_DATABASE_URL apuntando a una base de pruebas previamente migrada. Usa PostgreSQL real y limpia solo sus propios fixtures. Ver ADR-005 para las decisiones aprobadas y los limites del MVP.
+
+## Archivos y responsabilidades
+
+Las rutas de esta tabla parten de la raiz del repositorio.
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `src/prospecting-jobs/dto/job.request.ts` | Creado. Valida creación, consulta paginada y formato de exportación. |
+| `src/prospecting-jobs/prospecting-jobs.controller.ts` | Creado. Contiene el controlador público y el de callbacks internos; entrega exportaciones binarias. |
+| `src/prospecting-jobs/prospecting-jobs.service.ts` | Creado. Coordina idempotencia, estados, cancelación, eventos, guardado y exportación. |
+| `src/prospecting-jobs/internal-api-key.guard.ts` | Creado. Autentica callbacks mediante X-API-Key usando comparación de hashes en tiempo constante. |
+| `src/prospecting-jobs/services/job-memory.service.ts` | Creado. Guarda resultados/progreso temporales y serializa operaciones de un mismo job dentro del proceso. |
+| `src/prospecting-jobs/services/job-memory.service.spec.ts` | Creado. Prueba caducidad, capacidad, copias independientes y liberación de bloqueos. |
+| `src/prospecting-jobs/services/job-export.service.ts` | Creado. Construye CSV y XLSX; escapa CSV y evita interpretar resultados como fórmulas. |
+| `src/prospecting-jobs/prospecting-jobs.module.ts` | Modificado. Integra Campaigns, Prospects, ProspectorClient, Common y Prisma. |
+
+La [entrega completa](../../Docs/ENTREGA-MODULOS-BACKEND.md) explica como se relaciona este modulo con los demas, las verificaciones realizadas y los pasos pendientes.

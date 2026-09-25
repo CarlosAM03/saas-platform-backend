@@ -43,3 +43,17 @@ Las pruebas conservan JWT, guards y AsyncLocalStorage reales y sustituyen Prisma
 No se agregan actualizacion o eliminacion de tenants: no estan definidas en el contrato V1 vigente.
 
 Consultar `MODULE-DEVELOPMENT.md` antes de implementar.
+
+## Archivos y responsabilidades
+
+Las rutas de esta tabla parten de la raiz del repositorio.
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `src/tenants/dto/create-tenant.request.ts` | Creado. Valida name y slug como textos. |
+| `src/tenants/dto/tenant.response.ts` | Creado. Describe los campos públicos de una organización. |
+| `src/tenants/tenants.controller.ts` | Creado. Expone listado, consulta y creación; restringe la creación a ADMIN. |
+| `src/tenants/tenants.service.ts` | Creado. Filtra organizaciones accesibles, crea tenant y roles de forma atómica y traduce slugs duplicados a 409. |
+| `src/tenants/tenants.module.ts` | Modificado. Conecta el controlador, el servicio, Common y Prisma. |
+
+La [entrega completa](../../Docs/ENTREGA-MODULOS-BACKEND.md) explica como se relaciona este modulo con los demas, las verificaciones realizadas y los pasos pendientes.

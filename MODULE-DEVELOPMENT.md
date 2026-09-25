@@ -191,7 +191,7 @@ El reporte debe incluir:
 
 No ocultar contradicciones con casts, campos inventados, tenants ficticios o cambios silenciosos.
 
-## Modulos preparados
+## Modulos funcionales
 
 Estado del desarrollo funcional posterior a F4: **Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient implementados** para el MVP. ADR-005 registra las ampliaciones autorizadas de cancelacion e idempotencia persistente. Hay pruebas aisladas y una suite con PostgreSQL real (`test:jobs:db`). Los resultados/cursors temporales requieren una instancia; Python real se integra por el contrato interno. El README local de cada modulo documenta alcance y limites.
 
@@ -212,3 +212,7 @@ La jerarquía empieza por ADR-004 y el registro F4. Middleware abre un alcance A
 Auth/me permite identidad sin tenant seleccionado y devuelve el token presentado sin renovarlo. Users requiere tenant incluso para ADMIN; roleId omitido se resuelve a MEMBER. El requestId se crea antes de guards para cubrir errores 401/403. Evitar logs de headers, cuerpos, query strings y valores sensibles.
 
 Las correcciones conforme a F4 no requieren reabrir decisiones anteriores. Solo una nueva decisión arquitectónica requiere escalar la parte afectada.
+
+## Documentacion del trabajo realizado
+
+Consultar [Entrega de los modulos backend](Docs/ENTREGA-MODULOS-BACKEND.md) para el inventario de archivos, responsabilidades, rutas, configuracion, migracion, verificaciones y pendientes de integracion con Python.

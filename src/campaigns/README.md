@@ -43,3 +43,17 @@ El listado de prospectos se resuelve en CampaignsService mediante Prisma mientra
 `test/campaigns.e2e-spec.ts` verifica autenticacion, roles, tenant obligatorio, creacion, validacion, actualizaciones parciales, paginacion, busqueda, archivo, borrado fisico, conflictos de dependencias y aislamiento en peticiones concurrentes. Conserva JWT, guards y AsyncLocalStorage reales; solo reemplaza Prisma. Las restricciones de PostgreSQL se simulan y requieren validacion posterior contra una base real.
 
 Consultar `MODULE-DEVELOPMENT.md` para las convenciones transversales.
+
+## Archivos y responsabilidades
+
+Las rutas de esta tabla parten de la raiz del repositorio.
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `src/campaigns/dto/campaign.request.ts` | Creado. Contiene validadores para creación, actualización y el parámetro permanent. |
+| `src/campaigns/dto/campaign.response.ts` | Creado. Describe la respuesta pública de campaña. |
+| `src/campaigns/campaigns.controller.ts` | Creado. Expone las seis operaciones del módulo. |
+| `src/campaigns/campaigns.service.ts` | Creado. Aplica tenant, creador, búsqueda, orden, paginación, actualización, archivo, borrado y consulta de prospectos. |
+| `src/campaigns/campaigns.module.ts` | Modificado. Registra y exporta el servicio. |
+
+La [entrega completa](../../Docs/ENTREGA-MODULOS-BACKEND.md) explica como se relaciona este modulo con los demas, las verificaciones realizadas y los pasos pendientes.

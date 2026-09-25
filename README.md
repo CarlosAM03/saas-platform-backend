@@ -4,9 +4,15 @@ Backend principal de la plataforma SaaS para gestion de campanas de marketing y 
 
 Este repositorio contiene el proyecto NestJS en la raiz. El backend expone la Platform API, aplica autenticacion y autorizacion, mantiene el contexto tenant, persiste datos con Prisma y coordina servicios internos.
 
-> **Estado:** Baseline Fase 4 implementado y preparado para desarrollo funcional.
-> **Alcance actual:** Common, Auth, Users, Prisma, Health y modulos funcionales preparados.
-> **Fuente de verdad:** ADR-004, registro F4, Prisma/migraciones y OpenAPI alineados.
+> **Estado:** Baseline F4 y cinco modulos funcionales implementados para el MVP; integracion con Python real pendiente.
+> **Alcance actual:** Common, Auth, Users, Prisma, Health, Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient.
+> **Fuente de verdad:** ADR-004 y extensiones autorizadas en ADR-005, Prisma/migraciones y contratos OpenAPI.
+
+## Documentacion de la entrega funcional
+
+La [entrega de modulos backend](Docs/ENTREGA-MODULOS-BACKEND.md) explica cada archivo creado o modificado, las rutas, las reglas, las pruebas, la migracion y los pasos de integracion pendientes. Incluye una explicacion de los conceptos para quien empieza a trabajar con el codigo.
+
+Resultado registrado al cerrar la implementacion: **121 pruebas aprobadas** (40 unitarias, 64 E2E aisladas y 17 con PostgreSQL real). El servicio Python se sustituyo en las pruebas. La cache temporal requiere una instancia y no conserva resultados tras un reinicio.
 
 **Avance funcional posterior a F4:** Los cinco modulos estan implementados para el MVP: Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient. Jobs incluye idempotencia persistente, callbacks, cancelacion y exportacion CSV/XLSX. [ADR-005](Docs/ADRs/ADR-005-FunctionalJobs.md) registra las extensiones autorizadas y los limites de cache de una instancia. Las pruebas incluyen PostgreSQL real con el servicio Python sustituido; falta conectar el Python real del entorno. Aplicar las migraciones antes de iniciar. Las secciones de baseline y handoff siguientes son historicas; consultar los README locales para el estado funcional actual.
 
@@ -241,7 +247,7 @@ saas-platform-backend/
 ├── MODULE-DEVELOPMENT.md
 └── README.md
 ```
-`Common`, `Auth`, `Users` y `Prisma` contienen infraestructura implementada. `Tenants`, `Campaigns`, `Prospects`, `ProspectingJobs` y `ProspectorClient` son esqueletos NestJS preparados para la siguiente fase.
+`Common`, `Auth`, `Users` y `Prisma` contienen infraestructura implementada. `Tenants`, `Campaigns`, `Prospects`, `ProspectingJobs` y `ProspectorClient` contienen la implementacion funcional del MVP, documentada en sus README locales.
 ---
 
 ## 8. Modulos implementados
@@ -270,7 +276,7 @@ Usa Passport + JWT HS256, expiracion configurable de 8 horas, password hashing c
 
 Gestiona CRUD de usuarios, `UserTenant`, roles `OWNER/MEMBER` y desactivacion logica. Las consultas se restringen al tenant del `TenantContext`.
 
-## 9. Modulos preparados
+## 9. Modulos funcionales
 
 Cada modulo tiene un README local con su contexto, endpoints y dependencias:
 
@@ -414,7 +420,7 @@ Las pruebas E2E usan Jest y Supertest. El servidor normal requiere PostgreSQL co
 
 Si el codigo, contrato, schema o documentacion se contradicen, se debe detener la implementacion y reportar la diferencia conforme a `MODULE-DEVELOPMENT.md`.
 
-## 15. Alcance F4
+## 15. Alcance F4 (registro historico)
 
 F4 implementa el baseline transversal y deja preparados los modulos funcionales. La funcionalidad completa de Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient se desarrollara posteriormente sobre las decisiones congeladas.
 
@@ -431,7 +437,7 @@ El backend deberá desarrollarse considerando los siguientes principios:
 7. **La arquitectura debe permitir la incorporación progresiva de nuevas funcionalidades.**
 8. **Las decisiones arquitectonicas deberan documentarse conforme se conviertan en restricciones del sistema.**
 
-## 17. Handoff a Angel
+## 17. Handoff a Angel (registro historico)
 
 El baseline queda preparado para que Angel continue con la implementacion funcional sin redisenar la infraestructura transversal.
 
@@ -446,7 +452,9 @@ El baseline queda preparado para que Angel continue con la implementacion funcio
 - Prisma schema, PrismaService y seed idempotente para ADMIN global.
 - Pruebas unitarias y E2E en `saas-platform-backend/test/`.
 
-### Siguientes pasos de Angel
+### Siguientes pasos previstos al entregar F4 (historico)
+
+Estos pasos describen la entrega original. Los cinco modulos ya se implementaron; los pendientes actuales se detallan en [la entrega funcional](Docs/ENTREGA-MODULOS-BACKEND.md#13-pendientes-fuera-del-cierre-del-backend).
 
 1. Configurar PostgreSQL local y `DATABASE_URL`.
 2. Ejecutar migraciones, seed, build y pruebas.
@@ -457,7 +465,7 @@ El baseline queda preparado para que Angel continue con la implementacion funcio
 
 Flutter se desarrolla fuera de este repositorio y consume la Platform API definida en OpenAPI.
 
-## 18. Checklist de aceptacion F4
+## 18. Checklist de aceptacion F4 (registro historico)
 
 ### Proyecto e infraestructura
 
