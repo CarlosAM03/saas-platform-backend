@@ -68,6 +68,7 @@ model Tenant {
   campaigns   Campaign[]
   prospects   Prospect[]
   jobs        ProspectingJob[]
+  jobRequests ProspectingJobRequest[]
 
   @@map("tenants")
 }
@@ -86,6 +87,7 @@ model User {
   userTenants UserTenant[]
   createdCampaigns Campaign[] @relation("CampaignCreator")
   requestedJobs ProspectingJob[] @relation("JobRequester")
+  jobRequests ProspectingJobRequest[]
 
   @@map("users")
 }
@@ -200,6 +202,25 @@ model ProspectingJob {
   tenant        Tenant                @relation(fields: [tenantId], references: [id])
   campaign      Campaign              @relation(fields: [campaignId], references: [id])
   requester     User                  @relation("JobRequester", fields: [requestedBy], references: [id])
+  request       ProspectingJobRequest?
 
   @@map("prospecting_jobs")
+}
+
+// Approved functional extension: durable, user/tenant-scoped idempotency.
+model ProspectingJobRequest {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  userId      String   @map("user_id")
+  keyHash     String   @map("key_hash")
+  payloadHash String   @map("payload_hash")
+  jobId       String   @unique @map("job_id")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+  job         ProspectingJob @relation(fields: [jobId], references: [id])
+
+  @@unique([tenantId, userId, keyHash])
+  @@map("prospecting_job_requests")
 }

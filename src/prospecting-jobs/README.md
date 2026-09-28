@@ -26,4 +26,40 @@ Crear y consultar trabajos asincronos de prospeccion, controlar su lifecycle y c
 
 Platform Backend es dueño del estado persistente del Job. Respetar exactamente `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED` y `CANCELLED`. Toda query debe filtrar por tenant autenticado. No persistir resultados temporales como un modelo Prisma no definido.
 
-La implementacion funcional queda fuera del baseline F4. Consultar `MODULE-DEVELOPMENT.md`.
+## Implementacion funcional
+
+Implementadas las seis rutas publicas y POST /api/v1/internal/prospecting-jobs/:jobId/events. Las rutas publicas requieren JWT, roles ADMIN/OWNER/MEMBER y tenant seleccionado. El callback exige X-API-Key y obtiene el tenant del job, sin confiar en el cuerpo del evento.
+
+- Crear: exige Idempotency-Key, valida campana del tenant y registra job/clave atomicamente. La nueva tabla conserva la idempotencia tras reinicios. Un fallo de envio deja el mismo job disponible para reintentar con la misma clave.
+- Listar: page/limit/sortBy/sortOrder; limite 100. Ordenes permitidos: createdAt, updatedAt, startedAt, completedAt, status e id. No acepta search, que no esta declarado para Jobs.
+- Detalle: agrega resultados/progreso temporales al modelo persistido sin inventar columnas Prisma.
+- Cancelar: QUEUED se cancela localmente; RUNNING solicita cancelacion externa y espera callback CANCELLED. Estados COMPLETED/FAILED devuelven 409.
+- Persistir: requiere COMPLETED y resultados disponibles; delega en ProspectsService. Repeticiones conservadas en cache no vuelven a importar.
+- Exportar: entrega CSV/XLSX binarios del resultado del job; nunca mezcla toda la campana. Requiere resultados disponibles.
+
+Cache MVP: una sola instancia, TTL 24h desde la ultima actualizacion, maximo 1000 jobs. Reiniciar o expirar pierde resultados/progreso y el cursor de eventos temporal; no pierde jobs, prospectos guardados ni claves de creacion. Fuera de cache, persist/export responde 409. No hay worker local de scraping: Python ejecuta y reporta callbacks.
+
+## Puesta en marcha
+
+1. Configurar DATABASE_URL y aplicar `npx prisma migrate deploy`; luego `npm run prisma:generate`.
+2. Configurar PROSPECTOR_SERVICE_URL y PROSPECTOR_API_KEY. PLATFORM_CALLBACK_BASE_URL permite indicar un origen absoluto alcanzable desde Python.
+3. El servicio Python debe implementar inicio, cancelacion y callbacks segun el contrato interno actualizado.
+
+`npm run test:jobs:db` necesita JOBS_TEST_DATABASE_URL apuntando a una base de pruebas previamente migrada. Usa PostgreSQL real y limpia solo sus propios fixtures. Ver ADR-005 para las decisiones aprobadas y los limites del MVP.
+
+## Archivos y responsabilidades
+
+Las rutas de esta tabla parten de la raiz del repositorio.
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `src/prospecting-jobs/dto/job.request.ts` | Creado. Valida creación, consulta paginada y formato de exportación. |
+| `src/prospecting-jobs/prospecting-jobs.controller.ts` | Creado. Contiene el controlador público y el de callbacks internos; entrega exportaciones binarias. |
+| `src/prospecting-jobs/prospecting-jobs.service.ts` | Creado. Coordina idempotencia, estados, cancelación, eventos, guardado y exportación. |
+| `src/prospecting-jobs/internal-api-key.guard.ts` | Creado. Autentica callbacks mediante X-API-Key usando comparación de hashes en tiempo constante. |
+| `src/prospecting-jobs/services/job-memory.service.ts` | Creado. Guarda resultados/progreso temporales y serializa operaciones de un mismo job dentro del proceso. |
+| `src/prospecting-jobs/services/job-memory.service.spec.ts` | Creado. Prueba caducidad, capacidad, copias independientes y liberación de bloqueos. |
+| `src/prospecting-jobs/services/job-export.service.ts` | Creado. Construye CSV y XLSX; escapa CSV y evita interpretar resultados como fórmulas. |
+| `src/prospecting-jobs/prospecting-jobs.module.ts` | Modificado. Integra Campaigns, Prospects, ProspectorClient, Common y Prisma. |
+
+La [entrega completa](../../Docs/ENTREGA-MODULOS-BACKEND.md) explica como se relaciona este modulo con los demas, las verificaciones realizadas y los pasos pendientes.
