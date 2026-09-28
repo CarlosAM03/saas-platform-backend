@@ -1,33 +1,24 @@
-# Contratos API V1
+# Contratos y disponibilidad de la implementacion
 
-Este directorio contiene el contrato HTTP V1 de la plataforma. Los YAML son la referencia para generar DTOs, clientes y mocks; no son implementación NestJS ni modelos Prisma.
+## Contrato objetivo aprobado
 
-## Archivos
+`platform-api.v1.yaml` conserva el contrato publico baseline, incluidas las capacidades futuras de Jobs. No debe interpretarse como una declaracion de que todo esta implementado hoy.
 
-- `platform-api.v1.yaml`: API pública consumida por Flutter y provista por Platform Backend. Incluye autenticación, tenants, usuarios, campañas, prospectos y Jobs.
-- `prospector-service-api.v1.yaml`: API interna entre Platform Backend y Prospector Service. Incluye la aceptación de Jobs y el callback Service -> Platform.
-- `API_V1_AUDIT.md`: trazabilidad, contradicciones, decisiones y riesgos identificados al contrastar ADRs, dominio y Prisma.
+`prospector-service-api.v1.yaml` se reconcilio con el baseline del commit 9d17d0f. Se retiro la ruta adicional `/api/v1/prospecting/jobs/{jobId}/cancel`, que no queda fijada como arquitectura definitiva. Las rutas originales de inicio y callback se conservan como contrato de referencia para una integracion pendiente, no como servicio Python disponible.
 
-## Límites
+## Documento que muestra Swagger
 
-Flutter solo consume Platform API mediante `Authorization: Bearer <JWT>`. Flutter no llama directamente a Prospector Service. Platform es dueño del estado persistente de `ProspectingJob`, de los resultados temporales y de la decisión de persistir o exportar.
+`src/common/openapi/deployment-document.ts` lee el contrato publico y prepara una vista de la implementacion para `/api/docs` y `/api/docs-json`. No escribe ni modifica el YAML objetivo.
 
-Platform llama a Prospector Service con `X-API-Key`. El Service llama al callback interno de Platform con `X-API-Key`. La clave concreta proviene del entorno; rotación operativa e implementación de integración quedan fuera del baseline F4.
+| Operacion Jobs | Disponibilidad actual |
+| --- | --- |
+| GET listado y detalle | Consulta datos persistidos con aislamiento por tenant. Sin resultados/progreso temporal. |
+| POST inicio, cancel y persist | No disponibles: 503 despues de autenticacion y validacion. |
+| GET export | No disponible: error JSON 503, no respuesta binaria. |
+| POST callback interno | Requiere API key y DTO valido; no procesa eventos y devuelve 503. Se documenta aqui; no se publica como ruta de Flutter en Swagger. |
 
-## Tenant y persistencia
+El wrapper de indisponibilidad conserva el comportamiento del filtro global: code HTTP_503, message Internal server error y details.reason PROSPECTOR_INTEGRATION_PENDING. El frontend puede distinguir esta situacion por el motivo, sin interpretar un error como scraping aceptado.
 
-La arquitectura V1 usa Shared Database + Shared Schema + Tenant ID. El tenant de las operaciones de negocio se resuelve desde el contexto autenticado y no se acepta como parámetro arbitrario de Flutter. `tenantId` aparece en el detalle del Job y en el request interno porque forman parte de contratos ya definidos, no porque el cliente pueda elegir libremente el tenant.
+La vista Swagger preserva DTOs, rutas y autenticacion del contrato objetivo; para las cuatro operaciones publicas deshabilitadas muestra los errores de entrada y 503, sin respuestas exitosas ficticias. Las consultas de Jobs documentan tenant obligatorio y el ordenamiento realmente admitido.
 
-Los recursos API son DTOs. `passwordHash` nunca se expone. `BusinessResult`, `PipelineProgress`, `results`, `progress` y `resultsAvailable` son estructuras de integración, computadas o temporales; no crean una tabla `ProspectingResult`.
-
-## Evolución
-
-La versión se expresa en la ruta (`/api/v1`). Cambios incompatibles deben publicarse bajo `/api/v2`; cambios compatibles pueden añadir propiedades opcionales, estados de metadatos o nuevos endpoints tras actualizar la trazabilidad. Antes de cambiar un DTO, actualizar ADR-002 y este directorio, y comprobar el mapping hacia Prisma.
-
-F4 fija JWT HS256 de 8h, sin refresh token ni blacklist, y rate limiting de login 5/60s/IP. El JWT es snapshot; UserTenant se valida al emitir contexto. RLS, TTL/cache, reintentos y cancelación física están fuera del baseline.
-
-Swagger carga platform-api.v1.yaml en /api/docs, con servidor relativo al origen actual. F4 implementa Auth, Users y Health; los demás endpoints conservan su contrato objetivo. meta es opcional, logout y DELETE Users devuelven data: {}. ADMIN es global; OWNER/MEMBER son tenant-scoped. ADR-004 y el registro F4 gobiernan.
-
-## Nota de compatibilidad
-
-ADR-002 define la exportación como `GET /api/v1/prospecting-jobs/{id}/export?format=csv|xlsx`; por eso el contrato V1 usa GET aunque algunos listados preliminares hayan mostrado POST. No se añade un alias POST sin una decisión posterior explícita.
+No usar ADR-005 como fuente de nuevas decisiones. Su contenido se conserva como historial/propuesta pendiente de validacion.

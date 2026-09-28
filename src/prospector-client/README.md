@@ -1,44 +1,32 @@
 # Prospector Client Module
 
-## Proposito
+## Estado actual: integracion deshabilitada
 
-Encapsular la comunicacion Platform Backend -> Prospector Service. No contiene el motor de prospeccion ni logica de dominio de Jobs.
+Desde el segundo paso de hardening (27 de septiembre de 2026), este modulo contiene un adaptador deshabilitado. No ejecuta HTTP, no usa fetch, no inicia scraping y no simula una aceptacion exitosa.
 
-## Contrato relacionado
+`assertAvailable`, `startJob` y `cancelJob` rechazan la operacion con HTTP 503. El wrapper mantiene el mensaje generico de errores del servidor y expone `error.details.reason = PROSPECTOR_INTEGRATION_PENDING` para identificar el motivo sin exponer datos internos.
 
-- `POST /api/v1/prospecting/jobs` en `prospector-service-api.v1.yaml`.
-- Callbacks internos de eventos hacia Platform Backend.
+Configurar PROSPECTOR_SERVICE_URL o PROSPECTOR_API_KEY no activa el adaptador. Estas variables ya no son necesarias para arrancar la plataforma. No hay reintentos, timeouts ni politicas nuevas de integracion.
 
-## Dependencias
-
-- `@nestjs/config` para `PROSPECTOR_SERVICE_URL` y `PROSPECTOR_API_KEY`.
-- `ProspectingJobsModule` como consumidor del cliente.
-- DTOs de integracion definidos por el contrato OpenAPI.
-- Pino para logging de requests externos sin exponer API keys.
-
-## Reglas
-
-Enviar `X-API-Key` solo al servicio interno. No exponer este cliente directamente a Flutter. No persistir Jobs ni resultados en este modulo. Los timeouts, reintentos y cancelacion fisica deben respetar decisiones posteriores y no inventarse aqui.
-
-## Implementacion funcional
-
-`startJob` envia el DTO al endpoint interno y exige HTTP 202, el mismo jobId, estado QUEUED y fecha ISO valida. `cancelJob` usa POST /api/v1/prospecting/jobs/:jobId/cancel, ampliacion autorizada en ADR-005. Ambos usan X-API-Key y rechazan redirecciones. No agregan reintentos ni una politica propia de timeout operacional.
-
-No expone un controller publico ni accede a Prisma. Usa fetch de Node.js. Los DTOs de eventos incluyen validacion anidada para callbacks. El guard de API key pertenece al modulo Jobs.
-
-`prospector-client.service.spec.ts` verifica aceptacion, errores de red/HTTP, respuestas invalidas y cancelacion. La prueba del backend con PostgreSQL sustituye este servicio; la ejecucion real de scraping y la cancelacion fisica requieren el servicio Python externo.
-
-## Archivos y responsabilidades
-
-Las rutas de esta tabla parten de la raiz del repositorio.
+## Archivos
 
 | Archivo | Responsabilidad |
 | --- | --- |
-| `src/prospector-client/dto/start-prospecting-job.request.ts` | Creado. Describe el trabajo que NestJS envía a Python. |
-| `src/prospector-client/dto/accepted-job.response.ts` | Creado. Describe la confirmación de aceptación. |
-| `src/prospector-client/dto/job-event.request.ts` | Creado. Valida eventos, progreso, errores y resultados anidados recibidos por callback. |
-| `src/prospector-client/prospector-client.service.ts` | Creado y ampliado. Envía inicio y cancelación mediante fetch, usa API key y comprueba las respuestas. |
-| `src/prospector-client/prospector-client.module.ts` | Modificado. Proporciona configuración y exporta el servicio; no expone rutas públicas. |
-| `src/prospector-client/prospector-client.service.spec.ts` | Creado y ampliado. Prueba solicitudes, códigos HTTP, respuestas inválidas, fechas y cancelación. |
+| `prospector-client.service.ts` | Adaptador deshabilitado; rechaza inicio y cancelacion sin conexiones externas. |
+| `prospector-client.module.ts` | Registra y exporta el adaptador sin dependencia directa de ConfigModule. |
+| `prospector-client.service.spec.ts` | Comprueba indisponibilidad y ausencia de llamadas HTTP. |
+| `dto/start-prospecting-job.request.ts` | Conserva la estructura contractual de solicitud para la integracion pendiente. |
+| `dto/accepted-job.response.ts` | Conserva los tipos de respuesta; el adaptador actual no produce aceptaciones. |
+| `dto/job-event.request.ts` | Conserva los DTOs de eventos; no implica que los callbacks esten disponibles productivamente. |
 
-La [entrega completa](../../Docs/ENTREGA-MODULOS-BACKEND.md) explica como se relaciona este modulo con los demas, las verificaciones realizadas y los pasos pendientes.
+## Relacion con Jobs
+
+Jobs comprueba disponibilidad antes de escribir un trabajo nuevo, cancelar o procesar un evento. El guard interno sigue rechazando callbacks sin una API key configurada y valida. Con una clave valida, el procesamiento tambien queda bloqueado por el adaptador deshabilitado.
+
+La suite `test/jobs.postgres-spec.ts` usa PostgreSQL real y el adaptador deshabilitado, sin sustituirlo por aceptaciones simuladas. Verifica que los inicios/cancelaciones/callbacks no escriben trabajos y que los datos baseline siguen consultables. La cache, importacion y exportacion anteriores ya fueron retiradas; las rutas de integracion quedan no disponibles.
+
+## Pendientes
+
+La integracion real, cancelacion fisica y politicas operacionales deben definirse con Prospector Service. ADR-005 y la entrega anterior describen trabajo historico; no hacen que esta integracion este activa.
+
+Consultar el [registro de entrega y hardening](../../Docs/ENTREGA-MODULOS-BACKEND.md).

@@ -1,12 +1,14 @@
 # Module Development Guide
 
+> **Estado de hardening al 27/09/2026:** completados los pasos de permisos, desactivacion HTTP y retirada de idempotencia persistente, cache, importacion y exportacion. Prisma vuelve al baseline F4. Jobs conserva consultas; las operaciones de integracion devuelven indisponibilidad. Contratos y documentacion de disponibilidad reconciliados; verificacion final de despliegue pendiente. Las descripciones del flujo completo anteriores al hardening son historicas.
+
 Guia principal para Angel y agentes IA que implementen modulos funcionales sobre el baseline F4.
 
 ## Orden de lectura
 
 1. [ADR-004](Docs/ADRs/ADR-004-CommonBaseline.md), decisiones transversales.
-2. [OpenAPI Platform V1](Docs/Contracts/platform-api.v1.yaml), contrato publico.
-3. [Prisma schema](Prisma/schema.prisma), modelo persistente.
+2. [Prisma schema](Prisma/schema.prisma) y migraciones baseline.
+3. [OpenAPI Platform V1](Docs/Contracts/platform-api.v1.yaml), contrato publico.
 4. [ADR-003](Docs/ADRs/ADR-003-AuthSecureTransversal.md), seguridad.
 5. Este documento.
 6. README local del modulo.
@@ -193,7 +195,7 @@ No ocultar contradicciones con casts, campos inventados, tenants ficticios o cam
 
 ## Modulos funcionales
 
-Estado del desarrollo funcional posterior a F4: **Tenants, Campaigns, Prospects, ProspectingJobs y ProspectorClient implementados** para el MVP. ADR-005 registra las ampliaciones autorizadas de cancelacion e idempotencia persistente. Hay pruebas aisladas y una suite con PostgreSQL real (`test:jobs:db`). Los resultados/cursors temporales requieren una instancia; Python real se integra por el contrato interno. El README local de cada modulo documenta alcance y limites.
+Estado actual: Tenants, Campaigns y la gestion de Prospects persistidos son funcionales. Jobs conserva listado/detalle; inicio, cancelacion, persistencia, exportacion y callbacks estan deshabilitados. Se retiraron idempotencia persistente, cache, importacion y ExcelJS. ADR-005 es solo historial/propuesta. Swagger muestra la disponibilidad actual sin modificar el contrato publico objetivo; consultar [handoff](Docs/HANDOFF-HARDENING.md) y [contratos](Docs/Contracts/README.md).
 
 - [Tenants](src/tenants/README.md)
 - [Campaigns](src/campaigns/README.md)

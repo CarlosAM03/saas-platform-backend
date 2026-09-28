@@ -1,65 +1,35 @@
 # Prospecting Jobs Module
 
-## Proposito
+## Estado actual: consulta de registros y operaciones de integracion no disponibles
 
-Crear y consultar trabajos asincronos de prospeccion, controlar su lifecycle y coordinar resultados temporales con Prospector Service.
+El modelo ProspectingJob del baseline se conserva. GET /api/v1/prospecting-jobs lista los registros existentes con paginacion y filtro por tenant; GET /api/v1/prospecting-jobs/:id devuelve el detalle del tenant autenticado.
 
-## OpenAPI relacionado
+El detalle devuelve resultsAvailable=false, results=null y progress=null. Un estado COMPLETED almacenado no implica que existan resultados temporales disponibles. No se reconstruyen resultados a partir de los prospectos de una campana.
 
-- `POST /api/v1/prospecting-jobs`
-- `GET /api/v1/prospecting-jobs`
-- `GET /api/v1/prospecting-jobs/{id}`
-- `POST /api/v1/prospecting-jobs/{id}/cancel`
-- `POST /api/v1/prospecting-jobs/{id}/persist`
-- `GET /api/v1/prospecting-jobs/{id}/export`
+## Operaciones pendientes
 
-## Dependencias
+POST de creacion, cancel y persist, y GET export, mantienen rutas, JWT, roles y validacion de entrada, pero responden 503 con error.details.reason=PROSPECTOR_INTEGRATION_PENDING. No crean ni modifican datos ni producen archivos. La creacion conserva la exigencia de Idempotency-Key sin guardarla ni implementar deduplicacion.
 
-- `PrismaService` para `ProspectingJob`.
-- `TenantContextService.requireTenantId()` y `@CurrentUser()`.
-- `ProspectorClientModule` para llamadas internas autenticadas con `X-API-Key`.
-- `CampaignsModule` para validar la campana del tenant.
-- `ProspectsModule` para persistir resultados bajo demanda.
-- `PaginationDto`, idempotencia, response wrapper y error filter.
+El callback POST /api/v1/internal/prospecting-jobs/:jobId/events conserva API key y validacion de DTO. Sin clave valida devuelve 401; una solicitud valida y autenticada devuelve 503. No procesa estados, secuencias, resultados ni progreso.
 
-## Reglas
-
-Platform Backend es dueño del estado persistente del Job. Respetar exactamente `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED` y `CANCELLED`. Toda query debe filtrar por tenant autenticado. No persistir resultados temporales como un modelo Prisma no definido.
-
-## Implementacion funcional
-
-Implementadas las seis rutas publicas y POST /api/v1/internal/prospecting-jobs/:jobId/events. Las rutas publicas requieren JWT, roles ADMIN/OWNER/MEMBER y tenant seleccionado. El callback exige X-API-Key y obtiene el tenant del job, sin confiar en el cuerpo del evento.
-
-- Crear: exige Idempotency-Key, valida campana del tenant y registra job/clave atomicamente. La nueva tabla conserva la idempotencia tras reinicios. Un fallo de envio deja el mismo job disponible para reintentar con la misma clave.
-- Listar: page/limit/sortBy/sortOrder; limite 100. Ordenes permitidos: createdAt, updatedAt, startedAt, completedAt, status e id. No acepta search, que no esta declarado para Jobs.
-- Detalle: agrega resultados/progreso temporales al modelo persistido sin inventar columnas Prisma.
-- Cancelar: QUEUED se cancela localmente; RUNNING solicita cancelacion externa y espera callback CANCELLED. Estados COMPLETED/FAILED devuelven 409.
-- Persistir: requiere COMPLETED y resultados disponibles; delega en ProspectsService. Repeticiones conservadas en cache no vuelven a importar.
-- Exportar: entrega CSV/XLSX binarios del resultado del job; nunca mezcla toda la campana. Requiere resultados disponibles.
-
-Cache MVP: una sola instancia, TTL 24h desde la ultima actualizacion, maximo 1000 jobs. Reiniciar o expirar pierde resultados/progreso y el cursor de eventos temporal; no pierde jobs, prospectos guardados ni claves de creacion. Fuera de cache, persist/export responde 409. No hay worker local de scraping: Python ejecuta y reporta callbacks.
-
-## Puesta en marcha
-
-1. Configurar DATABASE_URL y aplicar `npx prisma migrate deploy`; luego `npm run prisma:generate`.
-2. Configurar PROSPECTOR_SERVICE_URL y PROSPECTOR_API_KEY. PLATFORM_CALLBACK_BASE_URL permite indicar un origen absoluto alcanzable desde Python.
-3. El servicio Python debe implementar inicio, cancelacion y callbacks segun el contrato interno actualizado.
-
-`npm run test:jobs:db` necesita JOBS_TEST_DATABASE_URL apuntando a una base de pruebas previamente migrada. Usa PostgreSQL real y limpia solo sus propios fixtures. Ver ADR-005 para las decisiones aprobadas y los limites del MVP.
-
-## Archivos y responsabilidades
-
-Las rutas de esta tabla parten de la raiz del repositorio.
+## Dependencias y archivos
 
 | Archivo | Responsabilidad |
 | --- | --- |
-| `src/prospecting-jobs/dto/job.request.ts` | Creado. Valida creación, consulta paginada y formato de exportación. |
-| `src/prospecting-jobs/prospecting-jobs.controller.ts` | Creado. Contiene el controlador público y el de callbacks internos; entrega exportaciones binarias. |
-| `src/prospecting-jobs/prospecting-jobs.service.ts` | Creado. Coordina idempotencia, estados, cancelación, eventos, guardado y exportación. |
-| `src/prospecting-jobs/internal-api-key.guard.ts` | Creado. Autentica callbacks mediante X-API-Key usando comparación de hashes en tiempo constante. |
-| `src/prospecting-jobs/services/job-memory.service.ts` | Creado. Guarda resultados/progreso temporales y serializa operaciones de un mismo job dentro del proceso. |
-| `src/prospecting-jobs/services/job-memory.service.spec.ts` | Creado. Prueba caducidad, capacidad, copias independientes y liberación de bloqueos. |
-| `src/prospecting-jobs/services/job-export.service.ts` | Creado. Construye CSV y XLSX; escapa CSV y evita interpretar resultados como fórmulas. |
-| `src/prospecting-jobs/prospecting-jobs.module.ts` | Modificado. Integra Campaigns, Prospects, ProspectorClient, Common y Prisma. |
+| prospecting-jobs.module.ts | Conecta Common, Prisma y ProspectorClient; registra controladores y guard interno. |
+| prospecting-jobs.controller.ts | Expone las rutas conservadas y sus permisos; export devuelve un error JSON, no un archivo. |
+| prospecting-jobs.service.ts | Consulta datos baseline; rechaza operaciones de integracion pendientes. |
+| internal-api-key.guard.ts | Rechaza callbacks sin credencial valida, tambien cuando falta configurar la clave. |
+| dto/job.request.ts | Valida solicitudes, paginacion y formatos csv/xlsx del contrato. |
 
-La [entrega completa](../../Docs/ENTREGA-MODULOS-BACKEND.md) explica como se relaciona este modulo con los demas, las verificaciones realizadas y los pasos pendientes.
+Se retiraron JobMemoryService, JobExportService y sus providers, la dependencia directa de ProspectsModule/CampaignsModule, y la tabla adicional de idempotencia. No hay TTL, limite de cache, locks de jobs, eviction, replay, importacion ni exportacion productiva.
+
+## Pruebas
+
+`test/without-prospector.e2e-spec.ts` prueba indisponibilidad sin red ni escrituras con Prisma sustituido. `test/jobs.postgres-spec.ts` usa PostgreSQL real y el adaptador deshabilitado: verifica aislamiento de registros baseline, ausencia de la tabla retirada y que persist/export no alteran prospectos existentes ni entregan archivos.
+
+## Pendientes
+
+Integracion real, cache, importacion/deduplicacion, exportacion, cancelacion fisica e idempotencia persistente requieren definicion posterior. El contrato de Python se restauro al baseline y Swagger refleja la disponibilidad actual. Consultar el handoff para la verificacion final de despliegue pendiente. ADR-005 es registro historico, no autoridad arquitectonica.
+
+Consultar [entrega e historial de hardening](../../Docs/ENTREGA-MODULOS-BACKEND.md).

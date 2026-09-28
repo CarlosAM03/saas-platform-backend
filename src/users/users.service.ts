@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -38,7 +37,6 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserRequest): Promise<UserResponse> {
-    this.assertCanManageUsers();
     const tenantId = this.tenantContext.requireTenantId();
     const role = createUserDto.roleId
       ? await this.roleService.getRoleById(tenantId, createUserDto.roleId)
@@ -142,7 +140,6 @@ export class UsersService {
     id: string,
     updateUserDto: UpdateUserRequest,
   ): Promise<UserResponse> {
-    this.assertCanManageUsers();
     const tenantId = this.tenantContext.requireTenantId();
     const existing = await this.findUserInTenant(id, tenantId);
     const passwordHash = updateUserDto.password
@@ -183,9 +180,6 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
-    if (this.tenantContext.getPlatformRole() !== 'ADMIN') {
-      throw new ForbiddenException('Only ADMIN can deactivate users');
-    }
     const tenantId = this.tenantContext.requireTenantId();
     await this.findUserInTenant(id, tenantId);
     await this.prisma.user.update({
@@ -207,13 +201,6 @@ export class UsersService {
     }
 
     return user;
-  }
-
-  private assertCanManageUsers(): void {
-    const context = this.tenantContext.getRequiredContext();
-    if (context.platformRole !== 'ADMIN' && context.tenantRole !== 'OWNER') {
-      throw new ForbiddenException('Only OWNER or ADMIN can manage users');
-    }
   }
 
   private toResponse(

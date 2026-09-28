@@ -377,6 +377,37 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
     ).toBe(200);
   });
 
+  it.each([
+    ['member@example.com', 'post'],
+    ['member@example.com', 'patch'],
+    ['member@example.com', 'delete'],
+    ['owner@example.com', 'delete'],
+  ] as const)(
+    'rechaza %s en %s de usuarios sin modificar datos',
+    async (email, method) => {
+      const token = (await login(email)).body.data.accessToken;
+      const before = JSON.stringify(fake._state);
+      const path =
+        method === 'post' ? '/api/v1/users' : '/api/v1/users/user-member';
+      const response = await request(app.getHttpServer())
+        [method](path)
+        .set('Authorization', `Bearer ${token}`)
+        .send(
+          method === 'post'
+            ? {
+                name: 'Denied',
+                email: 'denied@example.com',
+                password: 'SecurePass123!',
+              }
+            : method === 'patch'
+              ? { name: 'Denied' }
+              : {},
+        );
+      expect(response.status).toBe(403);
+      expect(JSON.stringify(fake._state)).toBe(before);
+    },
+  );
+
   it('realiza desactivación lógica solo con ADMIN', async () => {
     const adminToken = (await login('admin@example.com')).body.data.accessToken;
     const tenantToken = (

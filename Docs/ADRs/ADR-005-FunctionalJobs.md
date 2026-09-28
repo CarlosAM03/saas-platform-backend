@@ -1,6 +1,8 @@
 # ADR-005: Integracion funcional de trabajos de prospeccion
 
-Estado: aceptado. Fecha: 2026-09-24.
+Estado: REGISTRO HISTORICO / PROPUESTA PENDIENTE DE VALIDACION. Fecha original: 2026-09-24.
+
+Revision de hardening: 2026-09-27. Este documento no es autoridad arquitectonica ni gobierna la implementacion. Conserva el registro de lo construido y las autorizaciones de la sesion anterior. El alcance del primer despliegue retira la persistencia adicional de idempotencia y desactiva la integracion real con Python. Los apartados siguientes describen la implementacion historica, no capacidades productivas actuales.
 
 ## Autorizaciones
 

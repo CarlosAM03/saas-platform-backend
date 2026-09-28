@@ -1,5 +1,7 @@
 # Entrega de los módulos funcionales del backend
 
+> **Estado de hardening al 27/09/2026:** completados los pasos de permisos, desactivacion HTTP y retirada de idempotencia persistente, cache, importacion y exportacion. Prisma vuelve al baseline F4. Jobs conserva consultas; las operaciones de integracion devuelven indisponibilidad. Contratos y documentacion de disponibilidad reconciliados; verificacion final de despliegue pendiente. Las descripciones del flujo completo anteriores al hardening son historicas.
+
 Fecha de documentación: 25 de septiembre de 2026.
 
 ## 1. Resultado y alcance
@@ -247,3 +249,80 @@ npm run test:jobs:db
 - [Contrato público](Contracts/platform-api.v1.yaml).
 - [Contrato interno de Python](Contracts/prospector-service-api.v1.yaml).
 - [Tenants](../src/tenants/README.md), [Campaigns](../src/campaigns/README.md), [Prospects](../src/prospects/README.md), [ProspectorClient](../src/prospector-client/README.md) y [ProspectingJobs](../src/prospecting-jobs/README.md).
+
+## 15. Ajuste de autorizacion del 27 de septiembre de 2026
+
+Primer paso de hardening: se retiraron las comprobaciones estaticas redundantes de roles de TenantsService.create y UsersService.create/update/remove. Las rutas conservan sus decoradores @Roles y los guards globales AuthGuard y RolesGuard. Los servicios conservan el aislamiento por tenant y las reglas dinamicas, incluida la exigencia de ADMIN para borrar permanentemente una campana. Los metodos de escritura de estos servicios se invocan desde sus controladores; cualquier futuro punto de entrada debe aplicar la autorizacion correspondiente.
+
+Este ajuste no constituye el cierre del hardening: la reconciliacion de Prisma y la integracion de Prospector descritas en el PDF siguen pendientes.
+
+Verificacion de este ajuste: compilacion correcta y 68 pruebas E2E aprobadas (incluyen cuatro casos nuevos que comprueban rechazos 403 sin cambios en los datos). Esta verificacion usa el doble de Prisma de las suites E2E; no se ejecutaron pruebas PostgreSQL reales en este paso.
+
+## 16. Segundo paso de hardening: independencia de Python
+
+Se reemplazo la implementacion HTTP de ProspectorClientService por un adaptador deshabilitado. Se elimino su dependencia de ConfigModule y se sustituyeron las pruebas de respuestas HTTP externas por pruebas de indisponibilidad sin red.
+
+Se hicieron opcionales PROSPECTOR_SERVICE_URL y PROSPECTOR_API_KEY en la validacion de entorno y se comentaron los ejemplos relacionados en .env.example. La ausencia de API key ahora produce un rechazo 401 en el guard interno, sin excepcion de configuracion ni acceso anonimo.
+
+ProspectingJobsService comprueba disponibilidad antes de crear registros de idempotencia/jobs, cancelar o procesar callbacks. Rechaza con 503 y details.reason PROSPECTOR_INTEGRATION_PENDING; no anuncia aceptaciones ficticias ni modifica registros en esas operaciones. La suite historica PostgreSQL declara un doble de cliente con disponibilidad simulada, exclusivamente para pruebas.
+
+Se agrego test/without-prospector.e2e-spec.ts para verificar arranque y autenticacion sin configuracion de Python, consultas de tenants/usuarios, rechazo de inicio/cancelacion sin persistencia y callbacks sin clave. Prisma se sustituye en estas pruebas; no verifican una base real.
+
+Este paso no retira todavia el modelo/migracion de idempotencia, cache, exportacion ni importacion. Tampoco supone una verificacion completa de despliegue.
+
+Verificacion del segundo paso: 17 pruebas unitarias y 71 E2E aprobadas; compilacion correcta y ESLint sin errores ni advertencias en los archivos TypeScript modificados en este paso. Se retiraron las pruebas del cliente HTTP eliminado. No se ejecuto la suite PostgreSQL real en este paso.
+
+## 17. Tercer paso de hardening: retorno de Prisma al baseline
+
+Se retiro ProspectingJobRequest y sus relaciones en Tenant, User y ProspectingJob. Se elimino la migracion 20260925000100_job_idempotency del repositorio, sin crear una estrategia sustituta ni una migracion nueva. El schema restante coincide con el del commit baseline 9d17d0f (normalizando saltos de linea y espacios finales).
+
+ProspectingJobsService ya no calcula hashes, consulta claves, crea jobs ni registra aceptaciones. Crear sigue validando tenant e Idempotency-Key, pero devuelve indisponibilidad; cancelar tampoco modifica registros. Se retiraron sus dependencias de CampaignsService y ConfigService y el import directo de CampaignsModule. El modelo ProspectingJob original se conserva.
+
+ADR-005 queda marcado como registro historico/propuesta pendiente de validacion, no como decision aceptada ni autoridad arquitectonica. Se preserva el historial de autorizaciones de la sesion anterior.
+
+La suite test/jobs.postgres-spec.ts deja de simular un cliente disponible y sustituye las pruebas del flujo retirado por seis pruebas del alcance actual: ausencia de tabla adicional, solicitudes concurrentes sin altas de jobs, autenticacion y validacion, listado/detalle aislado, cancelaciones/callbacks sin escrituras y gestion de prospectos persistidos. Los prospectos de prueba se preparan directamente como fixtures, sin importacion de scraping.
+
+### Verificacion de este paso
+
+- Prisma validate y generacion del cliente: correctos.
+- Compilacion y ESLint de los TypeScript modificados en este paso: correctos.
+- 17 pruebas unitarias y 71 E2E aisladas aprobadas.
+- 6 pruebas con PostgreSQL 18 real aprobadas, usando una base nueva codex_hardening_baseline_20260927 en el servidor local de pruebas, puerto 55438.
+- Unicamente se aplico 20260909152421_init; comparacion de base y schema sin diferencias.
+- La limpieza de fixtures dejo cero tenants, usuarios, jobs y prospectos en esa base de pruebas.
+
+### Base habitual: pendiente de comprobar antes del despliegue
+
+La comprobacion de conexion a la base habitual no estuvo disponible. No se ejecuto SQL de borrado, reset ni despliegue de migraciones sobre ella. Retirar una migracion del repositorio no elimina tablas que ya existan en una base.
+
+En una base nueva, aplicar las migraciones actuales crea el baseline. Para una base existente, revisar primero su historial de migraciones y comprobar si contiene prospecting_job_requests. Si ya recibio la extension retirada, requiere una reconciliacion especifica de sus datos e historial antes del despliegue; no ejecutar migrate reset ni eliminar su historial para ocultar la diferencia.
+
+La idempotencia persistente queda pendiente de diseno/integracion. Cache, importacion, exportacion y resto del contrato interno se abordaran en los siguientes pasos. No se realizaron commits ni push en este paso.
+
+## 18. Cuarto paso: retirada de cache, importacion y exportacion
+
+Se eliminaron los archivos job-memory.service.ts, job-memory.service.spec.ts y job-export.service.ts. Se retiraron TTL, capacidad, eviction, locks locales y procesamiento de secuencias/eventos; los callbacks quedan como operacion no disponible despues de autenticacion y validacion.
+
+ProspectingJobsService conserva listado/detalle del baseline y devuelve resultsAvailable=false, results=null y progress=null. Persist y export responden 503 sin escrituras ni archivos, aunque el job almacenado este COMPLETED. El controlador de exportacion ya no construye respuestas binarias ni cabeceras de descarga.
+
+ProspectsService conserva listado, consulta, PATCH, validacion y aislamiento. Se elimino persistResults, su dependencia de BusinessResult y la regla de deduplicacion por coincidencia de datos cuando faltaba sourceIdentifier. No se introdujo otra regla.
+
+ProspectingJobsModule ya no depende de ProspectsModule ni registra servicios retirados. Se desinstalo ExcelJS y se actualizaron package.json/package-lock.json; npm retiro 77 paquetes en total. No quedan referencias ejecutables a JobMemoryService, JobExportService, persistResults ni ExcelJS en src/test o manifiestos.
+
+Se agregaron comprobaciones HTTP de permisos y formatos en las rutas deshabilitadas, ausencia de archivos adjuntos y errores JSON controlados. La suite PostgreSQL comprueba que un job COMPLETED no expone resultados inexistentes y que persist/export conservan los contactos y asociaciones existentes.
+
+No se modifico el esquema ni la base habitual en este paso. Contratos/documentacion general y verificacion final de despliegue siguen pendientes; el hardening completo no se considera terminado.
+
+Verificacion del cuarto paso: compilacion correcta, ESLint sin errores ni advertencias en los TypeScript modificados, 14 pruebas unitarias, 72 E2E aisladas y 7 PostgreSQL aprobadas (93 en total). Se retiraron las tres pruebas de la cache eliminada. La nueva prueba HTTP mantiene un listener local abierto para evitar que Supertest cierre el puerto entre solicitudes preparadas. PostgreSQL de pruebas se detuvo al terminar. No se hizo commit ni push.
+
+## 19. Quinto paso: contratos, Swagger y handoff
+
+Se restauro Docs/Contracts/prospector-service-api.v1.yaml al baseline 9d17d0f, retirando la ruta adicional de cancelacion de Python. El YAML publico platform-api.v1.yaml permanece sin cambios.
+
+Se agrego src/common/openapi/deployment-document.ts y main.ts lo utiliza para publicar la documentacion disponible: las cuatro operaciones publicas Jobs deshabilitadas muestran errores de entrada y 503, sin prometer altas ni archivos; las consultas documentan ausencia de resultados temporales y ordenamiento soportado. Es una vista de despliegue, no un cambio del contrato objetivo ni de las rutas.
+
+README principal fue actualizado para eliminar afirmaciones vigentes de capacidades retiradas. MODULE-DEVELOPMENT refleja el alcance real. Se agregaron Docs/Contracts/README.md y Docs/HANDOFF-HARDENING.md para distinguir contrato objetivo, disponibilidad actual y pendientes.
+
+Verificacion: compilacion correcta, ESLint de los TypeScript cambiados correcto, 73 E2E aprobadas. La nueva prueba consulta /api/docs-json por HTTP y verifica respuestas, seguridad y resolucion de referencias. Enlaces locales de los documentos principales correctos; YAML publico intacto y contrato interno identico al baseline. Las pruebas unitarias y PostgreSQL no se repitieron en este paso documental.
+
+No se realizaron commit, push ni despliegue. Instalacion limpia, configuracion/arranque final y reconciliacion de la base habitual (si recibio la extension retirada) siguen pendientes de comprobacion.

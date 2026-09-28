@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -14,9 +13,8 @@ import {
 } from '../common/dto/pagination.dto';
 import { UpdateProspectRequest } from './dto/update-prospect.request';
 import { ProspectResponse } from './dto/prospect.response';
-import type { BusinessResult } from '../prospector-client/dto/job-event.request';
 
-// Campos que podemos devolver según el contrato de la API.
+// Campos que podemos devolver segÃºn el contrato de la API.
 const prospectSelect = {
   id: true,
   campaignId: true,
@@ -45,88 +43,6 @@ export class ProspectsService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
   ) {}
-
-  async persistResults(campaignId: string, results: BusinessResult[]) {
-    const tenantId = this.tenantContext.requireTenantId();
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        return await this.prisma.$transaction(
-          async (transaction) => {
-            const campaign = await transaction.campaign.findFirst({
-              where: { id: campaignId, tenantId },
-            });
-            if (!campaign) throw new NotFoundException('Campaign not found');
-            let persisted = 0;
-            let skipped = 0;
-            for (const result of results) {
-              // NULL does not participate in PostgreSQL unique constraints. Use
-              // exact business/contact identity for those results, within the
-              // same tenant/campaign; SERIALIZABLE protects concurrent batches.
-              const where: Prisma.ProspectWhereInput = {
-                tenantId,
-                campaignId,
-                source: result.source,
-                sourceIdentifier: result.sourceIdentifier ?? null,
-                ...(result.sourceIdentifier == null
-                  ? {
-                      name: result.name,
-                      address: result.address ?? null,
-                      phone: result.phone ?? null,
-                      email: result.email ?? null,
-                      website: result.website ?? null,
-                    }
-                  : {}),
-              };
-              let prospect = await transaction.prospect.findFirst({ where });
-              if (prospect) skipped++;
-              else {
-                prospect = await transaction.prospect.create({
-                  data: {
-                    tenantId,
-                    campaignId,
-                    name: result.name,
-                    source: result.source,
-                    sourceIdentifier: result.sourceIdentifier,
-                    category: result.category,
-                    address: result.address,
-                    phone: result.phone,
-                    email: result.email,
-                    website: result.website,
-                    language: result.language,
-                    metadata: this.prepareMetadata(result.metadata),
-                  },
-                });
-                persisted++;
-              }
-              await transaction.campaignProspect.upsert({
-                where: {
-                  campaignId_prospectId: {
-                    campaignId,
-                    prospectId: prospect.id,
-                  },
-                },
-                create: { campaignId, prospectId: prospect.id },
-                update: {},
-              });
-            }
-            return { persisted, skipped };
-          },
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-        );
-      } catch (error) {
-        if (
-          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-          !['P2034', 'P2002'].includes(error.code)
-        )
-          throw error;
-        if (attempt === 2)
-          throw new ConflictException(
-            'Concurrent persistence; retry the request',
-          );
-      }
-    }
-    throw new ConflictException('Unable to persist results');
-  }
 
   async findAll(query: PaginationDto) {
     const tenantId = this.tenantContext.requireTenantId();

@@ -7,10 +7,8 @@ import {
   Param,
   Post,
   Query,
-  Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { JobEventRequest } from '../prospector-client/dto/job-event.request';
@@ -52,18 +50,8 @@ export class ProspectingJobsController {
     return this.jobs.persist(id);
   }
   @Get(':id/export')
-  async export(
-    @Param('id') id: string,
-    @Query() query: JobExportQuery,
-    @Res() response: Response,
-  ): Promise<void> {
-    const buffer = await this.jobs.export(id, query.format);
-    response.type(
-      query.format === 'csv'
-        ? 'text/csv; charset=utf-8'
-        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    response.attachment(`prospects.${query.format}`).send(buffer);
+  export(@Param('id') id: string, @Query() query: JobExportQuery) {
+    return this.jobs.export(id, query.format);
   }
 }
 

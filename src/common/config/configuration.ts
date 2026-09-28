@@ -5,8 +5,6 @@ export function validateEnvironment(environment: Record<string, unknown>) {
     'DATABASE_URL',
     'JWT_SECRET',
     'JWT_EXPIRES_IN',
-    'PROSPECTOR_SERVICE_URL',
-    'PROSPECTOR_API_KEY',
     'CORS_ORIGINS',
     'ADMIN_NAME',
     'ADMIN_EMAIL',

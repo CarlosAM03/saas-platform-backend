@@ -7,9 +7,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import * as fs from 'fs';
-import * as yaml from 'js-yaml';
+import { SwaggerModule } from '@nestjs/swagger';
+import { deploymentDocument } from './common/openapi/deployment-document';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -36,13 +35,8 @@ async function bootstrap() {
   );
   app.enableShutdownHooks();
 
-  // 📄 Swagger UI con OpenAPI YAML
-  const openApiYaml = fs.readFileSync(
-    './Docs/Contracts/platform-api.v1.yaml',
-    'utf8',
-  );
-  const document = yaml.load(openApiYaml) as OpenAPIObject;
-  document.servers = [{ url: '/' }];
+  // Describe deployed capabilities while preserving the baseline target contract.
+  const document = deploymentDocument();
 
   SwaggerModule.setup('api/docs', app, document, {
     customSiteTitle: 'SaaS Platform API',

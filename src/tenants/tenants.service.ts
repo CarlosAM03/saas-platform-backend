@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -47,10 +46,6 @@ export class TenantsService {
   }
 
   async create(request: CreateTenantRequest): Promise<TenantResponse> {
-    if (this.tenantContext.getPlatformRole() !== 'ADMIN') {
-      throw new ForbiddenException('Only ADMIN can create tenants');
-    }
-
     try {
       // A nested write creates the tenant and its roles atomically. ADMIN
       // remains global: creating a tenant does not create a membership.

@@ -6,8 +6,6 @@ const valid = {
   DATABASE_URL: 'postgresql://example.invalid/test',
   JWT_SECRET: 'unit-test-secret',
   JWT_EXPIRES_IN: '8h',
-  PROSPECTOR_SERVICE_URL: 'http://example.invalid',
-  PROSPECTOR_API_KEY: 'unit-test-key',
   CORS_ORIGINS: 'http://localhost:4200',
   ADMIN_NAME: 'Test',
   ADMIN_EMAIL: 'test@example.invalid',
@@ -15,6 +13,9 @@ const valid = {
 };
 
 describe('F4 configuration', () => {
+  it('starts without Prospector configuration', () => {
+    expect(() => validateEnvironment(valid)).not.toThrow();
+  });
   it.each(Object.keys(valid))('rejects missing %s before startup', (key) => {
     expect(() => validateEnvironment({ ...valid, [key]: ' ' })).toThrow(key);
   });

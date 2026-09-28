@@ -15,11 +15,12 @@ export class InternalApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     const supplied = request.headers['x-api-key'];
-    const expected = this.config.getOrThrow<string>('PROSPECTOR_API_KEY');
+    const expected = this.config.get<string>('PROSPECTOR_API_KEY');
     if (
       typeof supplied !== 'string' ||
       !supplied ||
-      !expected ||
+      typeof expected !== 'string' ||
+      !expected.trim() ||
       !timingSafeEqual(
         createHash('sha256').update(supplied).digest(),
         createHash('sha256').update(expected).digest(),
