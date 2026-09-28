@@ -3,7 +3,7 @@ import { Prisma, User, Role, UserTenant, Tenant } from '@prisma/client';
 
 export interface FakePrismaState {
   users: User[];
-  tenants: Pick<Tenant, 'id' | 'name' | 'slug' | 'status'>[];
+  tenants: Tenant[];
   roles: Pick<Role, 'id' | 'tenantId' | 'name' | 'description'>[];
   userTenants: UserTenant[];
 }
@@ -16,8 +16,22 @@ export async function createFakePrisma() {
   const inactivePassword = await bcrypt.hash('SecurePass123!', 4);
   const state: FakePrismaState = {
     tenants: [
-      { id: 'tenant-a', name: 'Tenant A', slug: 'tenant-a', status: 'ACTIVO' },
-      { id: 'tenant-b', name: 'Tenant B', slug: 'tenant-b', status: 'ACTIVO' },
+      {
+        id: 'tenant-a',
+        name: 'Tenant A',
+        slug: 'tenant-a',
+        status: 'ACTIVO',
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'tenant-b',
+        name: 'Tenant B',
+        slug: 'tenant-b',
+        status: 'ACTIVO',
+        createdAt: now,
+        updatedAt: now,
+      },
     ],
     roles: [
       {
@@ -146,7 +160,7 @@ export async function createFakePrisma() {
     email?: string;
     tenantId?: string;
     status?: string;
-    userTenants?: { some?: { tenantId?: string } };
+    userTenants?: { some?: { tenantId?: string; userId?: string } };
     OR?: Array<Partial<Record<'name' | 'email', { contains: string }>>>;
   };
   type UserArgs = {
@@ -197,6 +211,15 @@ export async function createFakePrisma() {
         m.userId === where.userId_tenantId.userId &&
         m.tenantId === where.userId_tenantId.tenantId,
     );
+  const matchesTenant = (tenant: Tenant, where: Where) =>
+    (!where.id || tenant.id === where.id) &&
+    (!where.status || tenant.status === where.status) &&
+    (!where.userTenants?.some?.userId ||
+      state.userTenants.some(
+        (membership) =>
+          membership.tenantId === tenant.id &&
+          membership.userId === where.userTenants?.some?.userId,
+      ));
   const prisma = {
     _state: state,
     $connect: () => Promise.resolve(),
@@ -339,12 +362,55 @@ export async function createFakePrisma() {
         ),
     },
     tenant: {
-      findFirst: ({ where }: { where: Where }) =>
-        state.tenants.find(
-          (t) =>
-            (!where.id || t.id === where.id) &&
-            (!where.status || t.status === where.status),
-        ) ?? null,
+      findFirst: ({ where }: { where: Where; select?: unknown }) =>
+        state.tenants.find((tenant) => matchesTenant(tenant, where)) ?? null,
+      findMany: ({
+        where,
+      }: {
+        where: Where;
+        select?: unknown;
+        orderBy?: unknown;
+      }) =>
+        state.tenants
+          .filter((tenant) => matchesTenant(tenant, where))
+          .sort(
+            (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+          ),
+      create: ({
+        data,
+      }: {
+        data: {
+          name: string;
+          slug: string;
+          roles: { create: { name: Role['name'] }[] };
+        };
+        select?: unknown;
+      }) => {
+        if (state.tenants.some((tenant) => tenant.slug === data.slug)) {
+          throw new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+            code: 'P2002',
+            clientVersion: 'test',
+          });
+        }
+        const tenant: Tenant = {
+          id: 'c' + String(state.tenants.length + 1).padStart(24, '0'),
+          name: data.name,
+          slug: data.slug,
+          status: 'ACTIVO',
+          createdAt: now,
+          updatedAt: now,
+        };
+        state.tenants.push(tenant);
+        state.roles.push(
+          ...data.roles.create.map((role) => ({
+            id: `${tenant.id}-${role.name}`,
+            tenantId: tenant.id,
+            name: role.name,
+            description: null,
+          })),
+        );
+        return tenant;
+      },
     },
   };
   return Object.assign(prisma, {

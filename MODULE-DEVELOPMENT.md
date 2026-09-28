@@ -193,6 +193,8 @@ No ocultar contradicciones con casts, campos inventados, tenants ficticios o cam
 
 ## Modulos preparados
 
+Estado del desarrollo funcional posterior a F4: **Tenants implementado** (listado, consulta y creacion administrativa, con pruebas E2E aisladas). Campaigns, Prospects, ProspectingJobs y ProspectorClient permanecen preparados para implementacion. El README local de cada modulo documenta su alcance actual.
+
 - [Tenants](src/tenants/README.md)
 - [Campaigns](src/campaigns/README.md)
 - [Prospects](src/prospects/README.md)
