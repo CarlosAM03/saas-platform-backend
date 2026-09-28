@@ -48,7 +48,7 @@ async function bootstrap() {
   const port = configService.getOrThrow<number>('PORT');
   const env = configService.get<string>('NODE_ENV') || 'development';
 
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   // 🚀 Logs informativos
   logger.log(`✅ Server running on http://localhost:${port}`);
