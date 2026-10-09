@@ -1,3 +1,17 @@
+FROM node:20-bookworm-slim AS development
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run prisma:generate
+
 FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app

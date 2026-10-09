@@ -7,15 +7,18 @@ const valid = {
   JWT_SECRET: 'unit-test-secret',
   JWT_EXPIRES_IN: '8h',
   CORS_ORIGINS: 'http://localhost:4200',
-  ADMIN_NAME: 'Test',
-  ADMIN_EMAIL: 'test@example.invalid',
-  ADMIN_PASSWORD: 'Test-only-123!',
 };
 
 describe('F4 configuration', () => {
   it('starts without Prospector configuration', () => {
     expect(() => validateEnvironment(valid)).not.toThrow();
   });
+  it.each(['ADMIN_NAME', 'ADMIN_EMAIL', 'ADMIN_PASSWORD'])(
+    'does not require seed-only %s at runtime',
+    (key) => {
+      expect(() => validateEnvironment({ ...valid, [key]: ' ' })).not.toThrow();
+    },
+  );
   it.each(Object.keys(valid))('rejects missing %s before startup', (key) => {
     expect(() => validateEnvironment({ ...valid, [key]: ' ' })).toThrow(key);
   });

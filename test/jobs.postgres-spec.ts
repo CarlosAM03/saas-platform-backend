@@ -64,9 +64,9 @@ describe('Baseline data and disabled Jobs with PostgreSQL (isolated fixtures)', 
   }
 
   beforeAll(() => {
-    if (!process.env.JOBS_TEST_DATABASE_URL)
+    if (!process.env.INTEGRATION_TEST_DATABASE_URL)
       throw new Error(
-        'Set JOBS_TEST_DATABASE_URL to a migrated disposable PostgreSQL database',
+        'Set INTEGRATION_TEST_DATABASE_URL to a migrated disposable PostgreSQL database',
       );
     prisma = new PrismaService();
   });
