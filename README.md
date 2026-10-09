@@ -1,6 +1,6 @@
 # Plataforma SaaS - Backend
 
-Backend NestJS y PostgreSQL para gestionar usuarios, organizaciones, campanas y prospectos persistidos. Estado al 27 de septiembre de 2026: hardening de implementacion y documentacion realizado por etapas; verificacion final de despliegue pendiente.
+Backend NestJS y PostgreSQL para gestionar usuarios, organizaciones, campañas y prospectos persistidos. El backend académico está desplegado con Docker en Render y utiliza PostgreSQL en Supabase; health/readiness y Swagger están publicados. DEV-ENV-001 añade un entorno local reproducible con Docker Compose. La integración Prospector continúa pendiente; el frontend Flutter y su integración no forman parte de este bloque.
 
 ## Alcance actual
 
@@ -75,4 +75,4 @@ La referencia es ADR-004/F4, Prisma y migraciones baseline, OpenAPI alineado, AD
 - [Tenants](src/tenants/README.md), [Campaigns](src/campaigns/README.md), [Prospects](src/prospects/README.md).
 - [Jobs](src/prospecting-jobs/README.md) y [ProspectorClient](src/prospector-client/README.md).
 
-Pendientes de diseno/integracion: Prospector Service/Engine, callbacks operacionales, cache real, importacion y deduplicacion, exportacion, idempotencia persistente, cancelacion fisica, retries y timeout operacional. La revision final de instalacion/despliegue y la entrega Git siguen pendientes.
+Pendientes de diseño/integración: Prospector Service/Engine, callbacks operacionales, caché real, importación y deduplicación, exportación, idempotencia persistente, cancelación física, retries y timeout operacional.

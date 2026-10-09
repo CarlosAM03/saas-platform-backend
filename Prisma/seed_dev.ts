@@ -6,6 +6,7 @@ import {
   PrismaClient,
   ProspectingJobStatus,
   RoleName,
+  UserStatus,
 } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -24,12 +25,12 @@ async function main(): Promise<void> {
   const existingAdmin = await prisma.user.findUnique({
     where: { email: adminEmail },
   });
-  if (existingAdmin && existingAdmin.platformRole !== 'ADMIN') {
-    throw new Error('Demo ADMIN email belongs to a non-admin account.');
+  if (existingAdmin && existingAdmin.id !== 'demo-admin') {
+    throw new Error('Demo ADMIN email belongs to another account.');
   }
   await prisma.user.upsert({
     where: { email: adminEmail },
-    update: {},
+    update: { passwordHash, status: UserStatus.ACTIVO, platformRole: 'ADMIN' },
     create: {
       id: 'demo-admin',
       name: 'Demo Admin',
@@ -44,6 +45,14 @@ async function main(): Promise<void> {
     { id: 'demo-tenant-sur', slug: 'demo-sur', name: 'Demo Sur' },
   ];
   for (const tenantData of tenants) {
+    const existingTenant = await prisma.tenant.findUnique({
+      where: { slug: tenantData.slug },
+    });
+    if (existingTenant && existingTenant.id !== tenantData.id) {
+      throw new Error(
+        `Demo tenant slug belongs to another tenant: ${tenantData.slug}`,
+      );
+    }
     const tenant = await prisma.tenant.upsert({
       where: { slug: tenantData.slug },
       update: {},
@@ -69,14 +78,18 @@ async function main(): Promise<void> {
     for (const person of people) {
       const id = `demo-user-${tenant.slug}-${person.role.toLowerCase()}`;
       const email = `${person.role.toLowerCase()}.${tenant.slug}@demo.example`;
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser && existingUser.id !== id) {
+        throw new Error(`Demo email belongs to another account: ${email}`);
+      }
       const user = await prisma.user.upsert({
         where: { email },
-        update: {},
+        update: { passwordHash, status: UserStatus.ACTIVO },
         create: { id, name: person.name, email, passwordHash },
       });
       await prisma.userTenant.upsert({
         where: { userId_tenantId: { userId: user.id, tenantId: tenant.id } },
-        update: {},
+        update: { roleId: roles[person.role] },
         create: {
           userId: user.id,
           tenantId: tenant.id,
@@ -134,24 +147,57 @@ async function main(): Promise<void> {
         },
       });
     }
-    const statuses = [
-      ProspectingJobStatus.QUEUED,
-      ProspectingJobStatus.RUNNING,
-      ProspectingJobStatus.COMPLETED,
-      ProspectingJobStatus.FAILED,
-      ProspectingJobStatus.CANCELLED,
+    const startedAt = new Date('2026-09-24T09:00:00.000Z');
+    const completedAt = new Date('2026-09-24T09:05:00.000Z');
+    const jobs = [
+      {
+        status: ProspectingJobStatus.QUEUED,
+        startedAt: null,
+        completedAt: null,
+        error: null,
+      },
+      {
+        status: ProspectingJobStatus.RUNNING,
+        startedAt,
+        completedAt: null,
+        error: null,
+      },
+      {
+        status: ProspectingJobStatus.COMPLETED,
+        startedAt,
+        completedAt,
+        error: null,
+      },
+      {
+        status: ProspectingJobStatus.FAILED,
+        startedAt,
+        completedAt,
+        error: 'Demo: simulated provider failure',
+      },
+      {
+        status: ProspectingJobStatus.CANCELLED,
+        startedAt,
+        completedAt,
+        error: null,
+      },
     ];
-    for (let index = 0; index < statuses.length; index++) {
-      const id = `demo-job-${tenant.slug}-${statuses[index].toLowerCase()}`;
+    for (let index = 0; index < jobs.length; index++) {
+      const lifecycle = jobs[index];
+      const id = `demo-job-${tenant.slug}-${lifecycle.status.toLowerCase()}`;
       await prisma.prospectingJob.upsert({
         where: { id },
-        update: {},
+        update: {
+          status: lifecycle.status,
+          startedAt: lifecycle.startedAt,
+          completedAt: lifecycle.completedAt,
+          error: lifecycle.error,
+        },
         create: {
           id,
           tenantId: tenant.id,
           campaignId: campaigns[index % campaigns.length].id,
           requestedBy: owner.id,
-          status: statuses[index],
+          ...lifecycle,
           query: {
             keyword: 'demo',
             location: 'Tijuana',

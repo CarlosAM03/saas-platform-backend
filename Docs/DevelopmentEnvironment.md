@@ -22,7 +22,7 @@ El Dockerfile conserva `runtime` como etapa final para Render. Compose usa `deve
 
 ## Datos y persistencia
 
-`Prisma/seed.ts` es el bootstrap mínimo y valida `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. `Prisma/seed_dev.ts` es otro flujo: requiere `DATABASE_ENV=local` o `shared-dev` y `DEV_SEED_PASSWORD` de al menos 12 caracteres. Compose aporta una contraseña exclusiva del entorno local. El seed crea o conserva 2 tenants, 1 ADMIN, un OWNER y MEMBER por tenant, roles y memberships, 6 campañas, 36 prospectos, asociaciones adicionales y Jobs históricos en los cinco estados. Usa IDs, slugs, emails y source identifiers deterministas. Sus `upsert` con actualización vacía no duplican ni borran datos manuales.
+`Prisma/seed.ts` es el bootstrap mínimo y valida `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. `Prisma/seed_dev.ts` es otro flujo: requiere `DATABASE_ENV=local` o `shared-dev` y `DEV_SEED_PASSWORD` de al menos 12 caracteres. Compose aporta una contraseña exclusiva del entorno local. El seed crea o conserva 2 tenants, 1 ADMIN, un OWNER y MEMBER por tenant, roles y memberships, 6 campañas, 36 prospectos, asociaciones adicionales y Jobs históricos en los cinco estados. Usa IDs, slugs, emails y source identifiers deterministas. Sus `upsert` no duplican ni borran datos manuales; restauran las credenciales, estado activo y memberships de cuentas demo reservadas, así como los campos temporales de Jobs demo.
 
 `docker compose down` seguido de `docker compose up` preserva el volumen. El reset local explícito es:
 
