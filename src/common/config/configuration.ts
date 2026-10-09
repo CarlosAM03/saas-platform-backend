@@ -6,9 +6,6 @@ export function validateEnvironment(environment: Record<string, unknown>) {
     'JWT_SECRET',
     'JWT_EXPIRES_IN',
     'CORS_ORIGINS',
-    'ADMIN_NAME',
-    'ADMIN_EMAIL',
-    'ADMIN_PASSWORD',
   ];
   const missingVariables = requiredVariables.filter((variable) => {
     const value = environment[variable];

@@ -75,6 +75,7 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
       app.get(ResponseInterceptor),
     );
     await app.init();
+    await app.listen(0, '127.0.0.1');
   }
 
   beforeEach(async () => createApp());

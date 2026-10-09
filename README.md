@@ -1,6 +1,6 @@
 # Plataforma SaaS - Backend
 
-Backend NestJS y PostgreSQL para gestionar usuarios, organizaciones, campanas y prospectos persistidos. Estado al 27 de septiembre de 2026: hardening de implementacion y documentacion realizado por etapas; verificacion final de despliegue pendiente.
+Backend NestJS y PostgreSQL para gestionar usuarios, organizaciones, campañas y prospectos persistidos. El backend académico está desplegado con Docker en Render y utiliza PostgreSQL en Supabase; health/readiness y Swagger están publicados. DEV-ENV-001 añade un entorno local reproducible con Docker Compose. La integración Prospector continúa pendiente; el frontend Flutter y su integración no forman parte de este bloque.
 
 ## Alcance actual
 
@@ -24,41 +24,27 @@ Flutter se comunica con NestJS; NestJS utiliza Prisma para acceder a PostgreSQL.
 
 AuthGuard y RolesGuard son globales. Los controladores declaran los roles con @Roles; los servicios conservan reglas dinamicas y filtros por tenant. Tenant y creador se obtienen de la sesion, no de valores enviados como autoridad por el cliente. ADMIN sigue necesitando seleccionar tenant para las operaciones de dominio que lo requieren.
 
-## Preparacion local
+## Inicio local
 
-Requisitos: Node.js/npm y PostgreSQL accesible. Ejecutar desde la raiz del repositorio.
-
-1. Crear `.env` a partir de `.env.example` solo si no existe y completar los valores.
-2. Instalar y generar el cliente:
+Requisitos: Git y Docker con Docker Compose. Desde un clon limpio:
 
 ```powershell
-npm ci
-npm run prisma:generate
+docker compose up --build
 ```
 
-3. En una base nueva, o una base cuyo historial ya se haya comprobado compatible, aplicar las migraciones:
+El stack inicia PostgreSQL 16, aplica `prisma migrate deploy`, carga el dataset de desarrollo y arranca NestJS con hot reload. No se necesita `.env`, Node ni PostgreSQL instalados en el host.
 
-```powershell
-npx prisma migrate deploy
-```
+- API: http://localhost:3000/api/v1
+- Swagger: http://localhost:3000/api/docs
+- Readiness: http://localhost:3000/api/v1/health/ready
 
-4. Para una instalacion nueva que necesite un administrador inicial, ejecutar `npm run prisma:seed` con sus variables configuradas.
-5. Compilar y arrancar:
+La [guía operacional](Docs/DevelopmentEnvironment.md) explica el seed, persistencia, reset local, pruebas PostgreSQL, shared-dev y CI. `Docs/Auditorias-Historico/` conserva el contexto histórico del despliegue; no es la guía vigente.
 
-```powershell
-npm run build
-npm run start:dev
-```
+**Base existente:** si un entorno aplicó previamente `20260925000100_job_idempotency`, hay que revisar su historial antes de desplegar. Quitar el archivo de migración no elimina estructuras ya aplicadas.
 
-Para ejecutar el compilado: `node dist/src/main.js`, tambien desde la raiz, porque Swagger lee `Docs/Contracts/platform-api.v1.yaml`. El despliegue debe incluir esa carpeta.
+## Configuración manual
 
-**Base existente:** se retiro del repositorio la migracion adicional de idempotencia. Si un entorno ya aplico `20260925000100_job_idempotency`, necesita revisar sus datos e historial antes del despliegue. Quitar el archivo no elimina una tabla existente. No usar un reset para ocultar la diferencia. La base habitual no se pudo comprobar en esta sesion; no fue modificada.
-
-## Configuracion
-
-Obligatorias: NODE_ENV, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN=8h, CORS_ORIGINS, ADMIN_NAME, ADMIN_EMAIL y ADMIN_PASSWORD.
-
-PROSPECTOR_SERVICE_URL, PROSPECTOR_API_KEY y PLATFORM_CALLBACK_BASE_URL no son necesarias para arrancar. Configurarlas no habilita el cliente ni los callbacks. No subir .env ni credenciales a Git.
+Para ejecutar fuera de Compose, usar `.env.example` como plantilla y configurar `NODE_ENV`, `PORT`, `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN=8h` y `CORS_ORIGINS`. `ADMIN_*` pertenece exclusivamente al seed bootstrap. Las variables Prospector no habilitan la integración pendiente. No subir archivos `.env` ni credenciales a Git.
 
 ## API y Swagger
 
@@ -72,17 +58,12 @@ Swagger muestra el alcance desplegado: identifica las operaciones no disponibles
 ## Pruebas
 
 ```powershell
-npm run test -- --runInBand
-npm run test:e2e -- --runInBand
+npm run test:unit:ci
+npm run test:e2e:ci
+docker compose --profile test run --rm test-postgres
 ```
 
-Para la suite PostgreSQL, definir JOBS_TEST_DATABASE_URL con una base exclusiva de pruebas migrada al baseline y ejecutar:
-
-```powershell
-npm run test:jobs:db
-```
-
-Esa suite usa PostgreSQL real, el adaptador deshabilitado y fixtures propios. Limpia solamente sus registros. No requiere Python ni prueba scraping real. Los resultados de cada etapa se registran en el [handoff de hardening](Docs/HANDOFF-HARDENING.md).
+La suite PostgreSQL usa `test-db`, separada de la base de desarrollo. Para ejecución manual requiere `INTEGRATION_TEST_DATABASE_URL` apuntando a una base desechable y migrada.
 
 ## Documentacion y autoridad
 
@@ -94,4 +75,4 @@ La referencia es ADR-004/F4, Prisma y migraciones baseline, OpenAPI alineado, AD
 - [Tenants](src/tenants/README.md), [Campaigns](src/campaigns/README.md), [Prospects](src/prospects/README.md).
 - [Jobs](src/prospecting-jobs/README.md) y [ProspectorClient](src/prospector-client/README.md).
 
-Pendientes de diseno/integracion: Prospector Service/Engine, callbacks operacionales, cache real, importacion y deduplicacion, exportacion, idempotencia persistente, cancelacion fisica, retries y timeout operacional. La revision final de instalacion/despliegue y la entrega Git siguen pendientes.
+Pendientes de diseño/integración: Prospector Service/Engine, callbacks operacionales, caché real, importación y deduplicación, exportación, idempotencia persistente, cancelación física, retries y timeout operacional.

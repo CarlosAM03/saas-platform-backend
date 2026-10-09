@@ -208,6 +208,7 @@ describe('Campaigns (e2e)', () => {
     app.useGlobalFilters(app.get(GlobalExceptionFilter));
     app.useGlobalInterceptors(app.get(ResponseInterceptor));
     await app.init();
+    await app.listen(0, '127.0.0.1');
     const jwt = app.get(JwtService);
     const token = (
       sub: string,
