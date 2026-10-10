@@ -42,6 +42,61 @@ La [guía operacional](Docs/DevelopmentEnvironment.md) explica el seed, persiste
 
 **Base existente:** si un entorno aplicó previamente `20260925000100_job_idempotency`, hay que revisar su historial antes de desplegar. Quitar el archivo de migración no elimina estructuras ya aplicadas.
 
+---
+
+### Credenciales locales de desarrollo
+
+El entorno Docker local utiliza credenciales deliberadamente exclusivas de
+desarrollo. No corresponden a producción ni a shared-dev.
+
+#### Usuarios demo
+
+Todas las cuentas utilizan:
+
+Password: `DevOnlyPass123!`
+
+| Rol | Email |
+| --- | --- |
+| ADMIN | `admin@demo.example` |
+| OWNER Demo Norte | `owner.demo-norte@demo.example` |
+| MEMBER Demo Norte | `member.demo-norte@demo.example` |
+| OWNER Demo Sur | `owner.demo-sur@demo.example` |
+| MEMBER Demo Sur | `member.demo-sur@demo.example` |
+
+Para una prueba rápida del frontend se recomienda:
+
+`owner.demo-norte@demo.example` / `DevOnlyPass123!`
+
+#### PostgreSQL local
+
+- Database: `saas_local`
+- User: `saas_local`
+- Password: `local-dev-only-password`
+- Host dentro de Compose: `db`
+- Port: `5432`
+
+PostgreSQL no se publica al host. Para abrir psql:
+
+`docker compose exec db psql -U saas_local -d saas_local`
+
+#### Restaurar el dataset demo
+
+Compose ejecuta migraciones y `Prisma/seed_dev.ts` mediante `db-init`.
+
+Reejecutar migraciones + seed sin eliminar el volumen:
+
+`docker compose run --rm db-init`
+
+Reejecutar únicamente el seed:
+
+`docker compose run --rm db-init npm run prisma:seed:dev`
+
+Reset completo y destructivo:
+
+`docker compose down -v`
+`docker compose up --build`
+---
+
 ## Configuración manual
 
 Para ejecutar fuera de Compose, usar `.env.example` como plantilla y configurar `NODE_ENV`, `PORT`, `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN=8h` y `CORS_ORIGINS`. `ADMIN_*` pertenece exclusivamente al seed bootstrap. Las variables Prospector no habilitan la integración pendiente. No subir archivos `.env` ni credenciales a Git.
