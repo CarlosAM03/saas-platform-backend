@@ -9,7 +9,7 @@ Backend NestJS y PostgreSQL para gestionar usuarios, organizaciones, campañas y
 | Auth y Users | Login JWT HS256 de 8 horas, seleccion de tenant, usuarios y permisos. |
 | Tenants | Listar y consultar organizaciones accesibles; creacion exclusiva de ADMIN. |
 | Campaigns | Crear, listar, consultar, modificar y archivar. Solo ADMIN puede borrar fisicamente. |
-| Prospects | Listar, buscar, consultar y editar contactos ya persistidos. |
+| Prospects | Crear contactos manualmente como ADMIN u OWNER; listar, buscar, consultar y editar contactos persistidos. Importación CSV pendiente. |
 | Infraestructura | TenantContext/AsyncLocalStorage, aislamiento, validacion, paginacion, wrappers, logging/requestId y health. |
 | Jobs | Listar y consultar registros existentes del tenant. No ejecuta scraping. |
 | ProspectorClient | Adaptador deshabilitado: no conecta con Python ni simula aceptaciones. |
@@ -17,6 +17,8 @@ Backend NestJS y PostgreSQL para gestionar usuarios, organizaciones, campañas y
 Inicio de Jobs, cancelacion, persistencia de resultados, exportacion y callbacks validos responden **503** con `error.details.reason=PROSPECTOR_INTEGRATION_PENDING`. Los errores previos de autenticacion y validacion conservan sus respuestas. El callback exige X-API-Key; sin clave configurada o valida devuelve 401.
 
 El detalle de Jobs devuelve `resultsAvailable=false`, `results=null` y `progress=null`, incluso si su estado persistido es COMPLETED. No hay importacion de scraping, cache de resultados, exportacion CSV/XLSX ni idempotencia persistente. Idempotency-Key sigue siendo obligatorio en la solicitud de creacion, pero no se guarda.
+
+El [resumen del desarrollo de prospectos](Docs/RESUMEN-PROSPECTOS.md) documenta la creación manual, los archivos modificados, las verificaciones locales y los acuerdos pendientes para importar CSV. Estos avances locales no acreditan un despliegue a producción.
 
 ## Arquitectura y permisos
 

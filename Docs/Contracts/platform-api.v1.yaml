@@ -382,6 +382,38 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/prospects:
+    post:
+      tags: [Prospects]
+      summary: Crea un prospecto manual
+      description: |
+        Disponible para ADMIN y OWNER con una organización seleccionada.
+        La campaña debe pertenecer a esa organización.
+        El backend asigna source=manual y sourceIdentifier=null.
+      operationId: createProspect
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProspectRequest'
+      responses:
+        '201':
+          description: Prospecto creado y asociado a la campaña.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Prospect'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
     get:
       tags: [Prospects]
       summary: Lista prospectos del tenant autenticado
@@ -771,7 +803,7 @@ components:
         phone: { type: string, nullable: true }
         email: { type: string, format: email, nullable: true }
         website: { type: string, format: uri, nullable: true }
-        source: { type: string, enum: [google_maps] }
+        source: { type: string, enum: [google_maps, manual, csv] }
         sourceIdentifier: { type: string, nullable: true }
         language: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/ProspectStatus' }
@@ -925,6 +957,48 @@ components:
         name: { type: string }
         description: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/CampaignStatus' }
+    CreateProspectRequest:
+      type: object
+      additionalProperties: false
+      required: [campaignId, name]
+      properties:
+        campaignId:
+          type: string
+          pattern: '^\S+$'
+          description: Identificador de campaña; debe existir en el tenant actual.
+        name:
+          type: string
+          pattern: '\S'
+          description: Nombre obligatorio; no puede contener solamente espacios.
+        category:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        website:
+          type: string
+          format: uri
+          nullable: true
+          description: URL con protocolo, por ejemplo https://ejemplo.com.
+        language:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [ACTIVO, INACTIVO]
+          default: ACTIVO
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
     UpdateProspectRequest:
       type: object
       minProperties: 1

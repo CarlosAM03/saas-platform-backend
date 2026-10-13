@@ -7,7 +7,7 @@ export interface ProspectResponse {
   phone: string | null;
   email: string | null;
   website: string | null;
-  source: 'google_maps';
+  source: 'google_maps' | 'manual' | 'csv';
   sourceIdentifier: string | null;
   language: string | null;
   status: 'ACTIVO' | 'INACTIVO';
