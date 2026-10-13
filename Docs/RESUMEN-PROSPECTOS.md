@@ -2,7 +2,59 @@
 
 Fecha de documentación: 13 de octubre de 2026.
 
+## Actualización: creación manual y avances posteriores
+
+La documentación operativa vigente está en el [README de Prospects](../src/prospects/README.md)
+y el [README del importador](../src/prospects/imports/README.md). Las secciones
+originales siguientes conservan el contexto y los acuerdos anteriores al CSV.
+
+### Estado respecto de la última referencia Git disponible
+
+La rama dev y la referencia local origin/dev coinciden en `9a40f85`
+(`feat(prospects): agregar creacion manual y documentacion`). La creación manual
+ya forma parte de ese commit. No se hizo fetch para certificar un estado remoto
+más reciente. No se realizó commit ni push del importador durante este trabajo.
+
+### Trabajo local posterior
+
+- Módulo independiente `src/prospects/imports/`, registrado en AppModule.
+- Preview/confirm multipart, autorizados para ADMIN/OWNER con tenant seleccionado.
+- Lector csv-parse: UTF-8, BOM, coma/punto y coma, comillas y saltos de línea.
+- Validación por fila, encabezados exactos, límites y tratamiento ausente/vacío.
+- Candidatos por nombre en todo el tenant; diferencias y campañas compartidas.
+- Acciones CREATE, LINK_EXISTING, UPDATE_EXISTING y SKIP explícitas.
+- Referencia firmada de 15 minutos vinculada a usuario, tenant, campaña, archivo
+  y snapshot; revalidación de coincidencias antes de escribir.
+- Transacción Serializable única y hasta tres intentos ante P2034; atomicidad
+  sin idempotencia durable ni nueva entidad persistente.
+- OpenAPI ampliado y parámetro CampaignId para no bloquear IDs demo en Swagger.
+- Dependencia csv-parse, ejemplo CSV y suites unitarias/E2E/PostgreSQL.
+- Documentación CSV movida desde Docs/CSV-IMPORT-V1.md al README del módulo.
+- Sin cambios al CRUD manual, Prisma, migraciones, scraping ni integración Python.
+
+### Evidencia nueva
+
+Build y lint del importador correctos; 34 unitarias, 73 E2E anteriores y 4 nuevas,
+y 10 PostgreSQL efímeras (7 baseline y 3 CSV) aprobadas. Las pruebas reales CSV
+cubren persistencia, repetición desactualizada, concurrencia y rollback completo.
+Docker API/DB healthy y ambas rutas visibles en Swagger.
+
+El usuario confirmó manualmente CREATE de dos prospectos, consulta en campaña,
+source=csv, ceros iniciales del teléfono, null en vacíos, SKIP de ambos candidatos,
+LINK_EXISTING en otra campaña y UPDATE_EXISTING explícito. La actualización
+cambió teléfono y limpió correo en ambas campañas, conservando columnas ausentes,
+ID, origen y fecha de creación. La consulta con ID demo funcionó tras corregir Swagger.
+
+Quedan por completar la confirmación repetida manual para observar 409, casos de
+error y cobertura adicional detallada en los READMEs. No se acredita producción.
+
 ## Estado actual
+
+Actualización CSV V1: implementación y pruebas aisladas añadidas después de este
+resumen. Consultar [README del importador CSV](../src/prospects/imports/README.md) para las reglas vigentes,
+rutas y limitaciones. No cambia Prisma; pruebas PostgreSQL efímeras aprobadas y
+rutas verificadas en Swagger. El flujo interactivo sigue pendiente. Las propuestas
+anteriores se conservan como historial.
 
 Implementamos en el entorno local la creación manual de prospectos dentro de una campaña. La compilación y las pruebas manuales realizadas en Swagger fueron confirmadas por el usuario como correctas.
 
