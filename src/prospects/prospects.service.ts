@@ -45,56 +45,54 @@ export class ProspectsService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  async create(
-    request: CreateProspectRequest,
-  ): Promise<ProspectResponse> {
+  async create(request: CreateProspectRequest): Promise<ProspectResponse> {
     const tenantId = this.tenantContext.requireTenantId();
-   const metadata = this.prepareMetadata(request.metadata);
+    const metadata = this.prepareMetadata(request.metadata);
 
-  return this.prisma.$transaction(async (transaction) => {
-    const campaign = await transaction.campaign.findFirst({
-      where: {
-        id: request.campaignId,
-        tenantId,
-      },
-      select: {
-        id: true,
-      },
+    return this.prisma.$transaction(async (transaction) => {
+      const campaign = await transaction.campaign.findFirst({
+        where: {
+          id: request.campaignId,
+          tenantId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!campaign) {
+        throw new NotFoundException('Campaign not found');
+      }
+
+      const prospect = await transaction.prospect.create({
+        data: {
+          tenantId,
+          campaignId: campaign.id,
+          name: request.name,
+          category: request.category,
+          address: request.address,
+          phone: request.phone,
+          email: request.email,
+          website: request.website,
+          language: request.language,
+          status: request.status,
+          metadata,
+          source: 'manual',
+          sourceIdentifier: null,
+        },
+        select: prospectSelect,
+      });
+
+      await transaction.campaignProspect.create({
+        data: {
+          campaignId: campaign.id,
+          prospectId: prospect.id,
+        },
+      });
+
+      return this.toResponse(prospect);
     });
-
-    if (!campaign) {
-      throw new NotFoundException('Campaign not found');
-    }
-
-    const prospect = await transaction.prospect.create({
-      data: {
-        tenantId,
-        campaignId: campaign.id,
-        name: request.name,
-        category: request.category,
-        address: request.address,
-        phone: request.phone,
-        email: request.email,
-        website: request.website,
-        language: request.language,
-        status: request.status,
-        metadata,
-        source: 'manual',
-        sourceIdentifier: null,
-      },
-      select: prospectSelect,
-    });
-
-    await transaction.campaignProspect.create({
-      data: {
-        campaignId: campaign.id,
-        prospectId: prospect.id,
-      },
-    });
-
-    return this.toResponse(prospect);
-  });
-}
+  }
 
   async findAll(query: PaginationDto) {
     const tenantId = this.tenantContext.requireTenantId();

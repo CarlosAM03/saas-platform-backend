@@ -2,6 +2,27 @@
 
 Fecha de documentación: 13 de octubre de 2026.
 
+## Reconciliación con main — 16 de octubre de 2026
+
+Se actualizó la información remota con git fetch y se integró origin/main
+(`2f5ccb6`) en dev mediante merge sin conflictos, conservando los commits de
+creación manual e importador. No se modificó ni publicó directamente main.
+
+La ejecución CI de `670fb98` falló en quality, paso lint:check; los jobs
+postgres-integration y docker-build sí terminaron correctamente:
+[ejecución original](https://github.com/CarlosAM03/saas-platform-backend/actions/runs/38460754118).
+El fallo se reprodujo: Prettier detectó formato incorrecto en create-prospect.request.ts,
+prospects.controller.ts y prospects.service.ts. Se corrigió solo formato en esos
+tres archivos, sin cambiar validación, permisos, transacciones ni comportamiento.
+
+Después de integrar main: lint:check, format:check, build, 34 pruebas unitarias
+y 77 E2E aprobados localmente. Ambas auditorías npm finalizaron con código cero
+al nivel high; reportan vulnerabilidades moderate que no bloquean ese umbral.
+No se alteraron dependencias ni el workflow para ocultar fallos.
+Docker no estaba disponible en esta revisión, por lo que no se repitieron
+localmente PostgreSQL ni docker-build. La nueva revisión debe completar CI
+en GitHub antes del merge definitivo a main.
+
 ## Actualización: creación manual y avances posteriores
 
 La documentación operativa vigente está en el [README de Prospects](../src/prospects/README.md)

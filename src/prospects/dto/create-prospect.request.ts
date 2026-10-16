@@ -11,10 +11,10 @@ import {
 
 export class CreateProspectRequest {
   @IsString()
-@Matches(/^\S+$/, {
-  message: 'campaignId debe ser un identificador no vacío y sin espacios',
-})
-campaignId!: string;
+  @Matches(/^\S+$/, {
+    message: 'campaignId debe ser un identificador no vacío y sin espacios',
+  })
+  campaignId!: string;
 
   @IsString()
   @Matches(/\S/, {
