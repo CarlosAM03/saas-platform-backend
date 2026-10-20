@@ -11,6 +11,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { ProspectsModule } from './prospects/prospects.module';
 import { ProspectingJobsModule } from './prospecting-jobs/prospecting-jobs.module';
 import { ProspectorClientModule } from './prospector-client/prospector-client.module';
+import { ProspectImportsModule } from './prospects/imports/prospect-imports.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ProspectorClientModule } from './prospector-client/prospector-client.mo
     TenantsModule,
     CampaignsModule,
     ProspectsModule,
+    ProspectImportsModule,
     ProspectingJobsModule,
     ProspectorClientModule,
   ],
