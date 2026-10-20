@@ -1066,16 +1066,17 @@ components:
         status: { $ref: '#/components/schemas/CampaignStatus' }
     ProspectImportValues:
       type: object
+      description: Valores leídos del CSV; las filas INVALID pueden conservar celdas de más de 2000 caracteres y reportar el error correspondiente.
       additionalProperties: false
       required: [name]
       properties:
-        name: { type: string, maxLength: 2000 }
-        category: { type: string, nullable: true, maxLength: 2000 }
-        address: { type: string, nullable: true, maxLength: 2000 }
-        phone: { type: string, nullable: true, maxLength: 2000 }
-        email: { type: string, nullable: true, maxLength: 2000 }
-        website: { type: string, nullable: true, maxLength: 2000 }
-        language: { type: string, nullable: true, maxLength: 2000 }
+        name: { type: string }
+        category: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        website: { type: string, nullable: true }
+        language: { type: string, nullable: true }
         status: { type: string, enum: [ACTIVO, INACTIVO] }
     ProspectImportErrors:
       type: array

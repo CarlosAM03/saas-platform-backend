@@ -1,6 +1,6 @@
 # Prospect Imports Module — CSV V1
 
-Fecha de documentación: 13 de octubre de 2026.
+Actualización: 20 de octubre de 2026.
 
 ## Propósito y alcance
 
@@ -370,7 +370,11 @@ Durante la prueba en Swagger se confirmó:
 
 La repetición manual de confirmación para comprobar 409 fue solicitada, pero
 no se recibió todavía su resultado. No se acredita aquí como prueba manual
-realizada. Tampoco se acredita despliegue a producción, commit o push.
+realizada. La repetición desactualizada sí está cubierta por la suite PostgreSQL.
+El baseline publicado `a91b79e` incluye el importador y su CI remoto está verde.
+El owner acepta CSV V1 y ratifica su contrato conforme a ADR-004; el
+[resumen de prospectos](../../../Docs/RESUMEN-PROSPECTOS.md) registra el cierre
+técnico como candidato a producción.
 
 ### Comandos
 
@@ -387,7 +391,7 @@ Las pruebas PostgreSQL requieren una base desechable migrada. No apuntarlas a
 shared-dev ni producción. Para Docker, reconstruir la imagen tras cambiar
 dependencias; el bind mount de src no actualiza node_modules.
 
-## Limitaciones y pendientes
+## Limitaciones y posibles ampliaciones de cobertura
 
 - V1 consulta los prospectos del tenant y compara nombres en aplicación; no hay
   columna normalizada ni índice nuevo. Medir rendimiento para tenants grandes.
@@ -398,7 +402,6 @@ dependencias; el bind mount de src no actualiza node_modules.
   y múltiples candidatos existentes; las pruebas actuales no certifican todos
   los casos posibles.
 - Completar pruebas manuales de referencia desactualizada y escenarios de error.
-- Mantener entrega Git separada del CRUD manual; no se realizó commit durante este trabajo.
 
 ## Referencias
 

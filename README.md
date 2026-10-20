@@ -9,7 +9,7 @@ Backend NestJS y PostgreSQL para gestionar usuarios, organizaciones, campañas y
 | Auth y Users | Login JWT HS256 de 8 horas, seleccion de tenant, usuarios y permisos. |
 | Tenants | Listar y consultar organizaciones accesibles; creacion exclusiva de ADMIN. |
 | Campaigns | Crear, listar, consultar, modificar y archivar. Solo ADMIN puede borrar fisicamente. |
-| Prospects | Crear contactos manualmente como ADMIN u OWNER; listar, buscar, consultar y editar contactos persistidos. Importación CSV pendiente. |
+| Prospects | Creación manual e importación CSV V1 (ADMIN/OWNER), con preview, deduplicación por nombre normalizado y confirmación atómica; listado, búsqueda, consulta y actualización de contactos persistidos. |
 | Infraestructura | TenantContext/AsyncLocalStorage, aislamiento, validacion, paginacion, wrappers, logging/requestId y health. |
 | Jobs | Listar y consultar registros existentes del tenant. No ejecuta scraping. |
 | ProspectorClient | Adaptador deshabilitado: no conecta con Python ni simula aceptaciones. |
@@ -18,7 +18,7 @@ Inicio de Jobs, cancelacion, persistencia de resultados, exportacion y callbacks
 
 El detalle de Jobs devuelve `resultsAvailable=false`, `results=null` y `progress=null`, incluso si su estado persistido es COMPLETED. No hay importacion de scraping, cache de resultados, exportacion CSV/XLSX ni idempotencia persistente. Idempotency-Key sigue siendo obligatorio en la solicitud de creacion, pero no se guarda.
 
-El [resumen del desarrollo de prospectos](Docs/RESUMEN-PROSPECTOS.md) documenta la creación manual, los archivos modificados, las verificaciones locales y los acuerdos pendientes para importar CSV. Estos avances locales no acreditan un despliegue a producción.
+La creación manual y CSV Import V1 están aceptados como candidato a producción en `dev`, con el contrato OpenAPI ratificado por el owner. El [resumen de prospectos](Docs/RESUMEN-PROSPECTOS.md) registra el cierre técnico; el [README del importador](src/prospects/imports/README.md) detalla sus reglas. V1 no incluye XLS/XLSX, historial de imports, idempotencia durable ni undo. Prospector Service/Engine continúa sin integración operativa.
 
 ## Arquitectura y permisos
 
@@ -132,4 +132,4 @@ La referencia es ADR-004/F4, Prisma y migraciones baseline, OpenAPI alineado, AD
 - [Tenants](src/tenants/README.md), [Campaigns](src/campaigns/README.md), [Prospects](src/prospects/README.md).
 - [Jobs](src/prospecting-jobs/README.md) y [ProspectorClient](src/prospector-client/README.md).
 
-Pendientes de diseño/integración: Prospector Service/Engine, callbacks operacionales, caché real, importación y deduplicación, exportación, idempotencia persistente, cancelación física, retries y timeout operacional.
+Evoluciones fuera del alcance actual: Prospector Service/Engine, callbacks operacionales, caché real, exportación, idempotencia persistente, cancelación física, retries y timeout operacional de Jobs.

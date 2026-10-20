@@ -1,6 +1,6 @@
 # Prospects Module
 
-Actualización: 13 de octubre de 2026.
+Actualización: 20 de octubre de 2026.
 
 ## Propósito
 
@@ -191,26 +191,21 @@ docker compose --profile test run --build --rm test-postgres
 PostgreSQL de tests debe ser desechable, nunca shared-dev/producción. La evidencia
 local no acredita despliegue productivo ni publicación de cambios locales.
 
-## Estado Git y cambios desde la última referencia publicada
+## Estado de integración
 
-Al revisar este trabajo, dev y la referencia local origin/dev coinciden en
-`9a40f85` (`feat(prospects): agregar creacion manual y documentacion`). Por tanto,
-la creación manual ya pertenece a esa referencia, no al diff local posterior.
-No se hizo fetch en esta revisión; no se certifica el estado remoto más reciente.
+La creación manual y CSV Import V1 están publicados en el baseline `a91b79e` de
+`dev`, que ya incluye `main` (`2f5ccb6`). El owner acepta ambas capacidades y
+ratifica expresamente los contratos de creación, preview y confirm conforme a
+ADR-004. Prisma y migraciones permanecen intactos. La evidencia vigente y la
+aceptación como candidato a producción están en el
+[resumen de prospectos](../../Docs/RESUMEN-PROSPECTOS.md).
 
-Los cambios locales posteriores incluyen módulo CSV, registro en AppModule,
-dependencia csv-parse, contrato preview/confirm, parámetro CampaignId, plantilla,
-pruebas unitarias/E2E/PostgreSQL y documentación local actualizada/movida.
-No incluyen cambios Prisma ni migraciones. No se hizo commit, push ni merge del
-importador durante este trabajo; mantener su entrega separada del CRUD manual.
-
-## Pendientes y referencias
+## Posibles ampliaciones de cobertura y referencias
 
 - Completar prueba manual de referencia desactualizada y casos de error.
 - Ampliar pruebas automatizadas específicas de creación manual.
 - Ampliar escenarios CSV de firma/vencimiento, múltiples candidatos y límites.
 - Medir búsqueda de candidatos para tenants grandes; V1 compara en aplicación.
-- Preparar entrega Git y verificación de despliegue cuando corresponda.
 
 Referencias: [guía de módulos](../../MODULE-DEVELOPMENT.md),
 [resumen de prospectos](../../Docs/RESUMEN-PROSPECTOS.md),
