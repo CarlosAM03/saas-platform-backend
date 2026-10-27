@@ -30,3 +30,31 @@ describe('F4 configuration', () => {
     expect(validateEnvironment(valid).PORT).toBe(3000);
   });
 });
+
+describe('production configuration safety', () => {
+  const production = {
+    ...valid,
+    NODE_ENV: 'production',
+    JWT_SECRET: 'secure-production-placeholder-for-tests-123456',
+    CORS_ORIGINS: 'https://frontend.example.invalid',
+  };
+  it('starts without any Service configuration', () =>
+    expect(() => validateEnvironment(production)).not.toThrow());
+  it.each(['short', 'replace-with-a-production-secret-even-if-long'])(
+    'rejects unsafe signing key %s',
+    (secret) =>
+      expect(() =>
+        validateEnvironment({ ...production, JWT_SECRET: secret }),
+      ).toThrow('JWT_SECRET'),
+  );
+  it.each([
+    '*',
+    'http://frontend.example.invalid',
+    'https://user:password@frontend.example.invalid',
+    'https://frontend.example.invalid/path',
+  ])('rejects unsafe CORS origin %s', (origin) =>
+    expect(() =>
+      validateEnvironment({ ...production, CORS_ORIGINS: origin }),
+    ).toThrow('CORS_ORIGINS'),
+  );
+});

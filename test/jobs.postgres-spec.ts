@@ -95,6 +95,21 @@ describe('Baseline data and disabled Jobs with PostgreSQL (isolated fixtures)', 
     userIds.push(...users.map((user) => user.id));
     userId = users[0].id;
     memberId = users[1].id;
+    for (const tenantId of [tenantA, tenantB]) {
+      const ownerRole = await prisma.role.create({
+        data: { tenantId, name: 'OWNER' },
+      });
+      const memberRole = await prisma.role.create({
+        data: { tenantId, name: 'MEMBER' },
+      });
+      await prisma.userTenant.create({
+        data: { userId, tenantId, roleId: ownerRole.id },
+      });
+      if (tenantId === tenantA)
+        await prisma.userTenant.create({
+          data: { userId: memberId, tenantId, roleId: memberRole.id },
+        });
+    }
     const campaigns = await Promise.all(
       [tenantA, tenantB].map((tenantId) =>
         prisma.campaign.create({
@@ -136,6 +151,8 @@ describe('Baseline data and disabled Jobs with PostgreSQL (isolated fixtures)', 
     await prisma.prospect.deleteMany({ where });
     await prisma.prospectingJob.deleteMany({ where });
     await prisma.campaign.deleteMany({ where });
+    await prisma.userTenant.deleteMany({ where });
+    await prisma.role.deleteMany({ where });
     await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();

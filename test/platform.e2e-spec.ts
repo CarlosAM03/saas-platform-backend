@@ -158,14 +158,14 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
     const memberList = await request(app.getHttpServer())
       .get('/api/v1/tenants')
       .set('Authorization', `Bearer ${member}`);
-    expect(memberList.body.data).toEqual([]);
+    expect(memberList.status).toBe(401);
     expect(
       (
         await request(app.getHttpServer())
           .get('/api/v1/tenants/tenant-a')
           .set('Authorization', `Bearer ${member}`)
       ).status,
-    ).toBe(404);
+    ).toBe(401);
     const adminList = await request(app.getHttpServer())
       .get('/api/v1/tenants')
       .set('Authorization', `Bearer ${admin}`);
@@ -286,7 +286,7 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
     });
   });
 
-  it('mantiene el snapshot del rol hasta emitir un nuevo JWT', async () => {
+  it('rechaza JWT previo cuando cambia el rol y aplica permisos vigentes', async () => {
     const token = (await login('owner@example.com')).body.data.accessToken;
     fake._state.userTenants.find((m) => m.userId === 'user-owner')!.roleId =
       'role-a-member';
@@ -298,7 +298,7 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
         email: 'snapshot@example.com',
         password: 'Test-password-123!',
       });
-    expect(oldContext.status).toBe(201);
+    expect(oldContext.status).toBe(401);
     const renewed = (await login('owner@example.com')).body.data.accessToken;
     expect(
       (

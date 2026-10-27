@@ -214,3 +214,31 @@ Se cerraron los procesos propietarios, se verificó el borrado de sus tenants fi
 y se detuvo sólo PostgreSQL temporal55439. La instancia existente5432 no se tocó.
 Commits Backend: d19b78a integración; b37fb92 arnés/contrato; b6cd40f mantenimiento/OpenAPI;
 commit final de documentación contiene esta constancia. Sin push, merge ni despliegue.
+
+
+## Cierre de seguridad y núcleo opcional — 27 de octubre de 2026
+
+Este apartado actualiza el dictamen anterior con los resultados del cierre. PR Draft [#6 hacia dev](https://github.com/CarlosAM03/saas-platform-backend/pull/6). No se ha fusionado ni desplegado esta revisión.
+
+### P0 reproducidos y corregidos
+
+1. Un JWT anterior conservaba privilegios tras revocar membresía, bajar un rol, suspender el tenant o revocar ADMIN. Se sustituye explícitamente la política previa de snapshot de autorización hasta renovar JWT: ahora cada petición autenticada valida contra PostgreSQL usuario activo, plataforma, membresía, rol y estado del tenant. Un contexto cambiado recibe 401 y exige renovar sesión. La expiración sigue siendo 8h, HS256 y firma verificada. Un JWT antiguo de A con permisos aún vigentes sigue limitado a A; seleccionar B no crea una revocación global de todas las sesiones.
+2. OWNER podía modificar la identidad global de otro usuario compartido con B, o la contraseña de un ADMIN asociado a A. Se protege la identidad global en transacción Serializable. OWNER conserva edición de usuarios locales y cambios de rol de su membresía local; la identidad de otro usuario compartido/ADMIN requiere administración global. Una denegación 403 `GLOBAL_IDENTITY_PROTECTED` no revela las otras membresías.
+
+Cinco pruebas negativas fallaron antes de corregirlos. `test/core-isolation.postgres-spec.ts` cubre fixtures A/B independientes, OWNER/MEMBER/ADMIN, GET/PATCH/DELETE cruzados contractuales, asociaciones, conteos, roles, JWT anterior, CSV, snapshots y ausencia de Service. El callback tardío después de seleccionar B se prueba con HTTP y PostgreSQL en `test/prospector-mvp.postgres-spec.ts`: sólo cambia A y B recibe 404.
+
+### Validación local de esta revisión
+
+- 68 pruebas unitarias, 77 HTTP y **46 PostgreSQL aprobadas** (incluyen FastAPI real con EnginePort controlado; no extracción pública).
+- Lint, formato, typecheck y build aprobados. Node local 22.16; CI declara Node 20 y aporta comprobación de ese runtime.
+- Arranque adicional del **entrypoint compilado de producción** `dist/src/main.js` mediante `test/scripts/core-stack.cjs`, cwd sin `.env`, JWT efímero fuerte, CORS HTTPS explícito, PostgreSQL desechable y ninguna credencial/URL de Service. Flutter real consumió Auth, tenants, usuarios, campañas, prospectos, CSV 600, dashboard y Jobs. Generación 503; cero Jobs ficticios y cero llamadas `fetch` salientes del Backend instrumentado. La prueba reside en `test/integration/core_stack_test.dart` del cliente; evidencia agregada sin credenciales en `build/test-evidence/core-stack.json`.
+- CSV sintético público `Docs/examples/prospects-demo-600.csv`: 600 preview/600 creados en transacción, dashboard 601 incluyendo un prospecto manual; reintento del mismo confirm 409; tenant B permanece en cero y acceso cruzado 404. Los XLSX reales sólo se inspeccionan y convierten en `.tmp` ignorado, sin importar contactos reales.
+- El primer CI de la jornada detectó avisos nuevos en dependencias transitivas. Se fijan body-parser 2.4.0, multer 2.5.0, fast-uri 3.1.9 y js-yaml 5.4.1. `npm audit` posterior: **0 vulnerabilidades**; sin omitir ni desactivar el gate. [body-parser](https://github.com/advisories/GHSA-27r3-jxmh-p828), [multer](https://github.com/advisories/GHSA-q7qp-rjg7-q26m), [js-yaml](https://github.com/advisories/GHSA-r3ph-w7gj-g6xm).
+
+Producción exige JWT_SECRET externo de al menos 32 caracteres y orígenes CORS HTTPS explícitos; se normalizan espacios entre orígenes. Los tests no leen `.env` local. No se exigen credenciales Prospector para arrancar.
+
+### Límites y despliegue
+
+Contrato público 1.1.0 conservado; 401/403 documentados ahora incluyen revocación efectiva y protección de identidad global. Contrato interno histórico sin cambios. Engine y Service sin modificaciones. Service permanece opcional: `PROSPECTOR_ENABLED=false` para la primera promoción. Cancel/persist/export HTTP no se habilitan.
+
+**Backend main ya contiene CSV V1**, al igual que dev; no se requiere portar CSV desde otra rama. Backup productivo, configuración administrada, cuenta ADMIN autorizada, SHA servido y smoke autenticado productivo requieren validación del propietario antes del despliegue. El resultado local no los certifica. El reporte global de readiness identifica los gates pendientes y la secuencia de promoción sin ejecutarla.

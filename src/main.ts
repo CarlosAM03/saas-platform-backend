@@ -25,7 +25,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   app.use(helmet());
   app.enableCors({
-    origin: configService.getOrThrow<string>('CORS_ORIGINS').split(','),
+    origin: configService
+      .getOrThrow<string>('CORS_ORIGINS')
+      .split(',')
+      .map((origin) => origin.trim()),
   });
   app.useGlobalPipes(
     new ValidationPipe({

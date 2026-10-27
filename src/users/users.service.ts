@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -77,8 +78,25 @@ export class UsersService {
         name: true,
         email: true,
         status: true,
+        platformRole: true,
+        userTenants: {
+          select: {
+            tenantId: true,
+            tenant: { select: { status: true } },
+            role: { select: { tenantId: true, name: true } },
+          },
+        },
       },
     });
+  }
+
+  async isTenantActiveForAuthentication(tenantId: string): Promise<boolean> {
+    return (
+      (await this.prisma.tenant.findFirst({
+        where: { id: tenantId, status: 'ACTIVO' },
+        select: { id: true },
+      })) !== null
+    );
   }
 
   async findAll(
@@ -141,7 +159,7 @@ export class UsersService {
     updateUserDto: UpdateUserRequest,
   ): Promise<UserResponse> {
     const tenantId = this.tenantContext.requireTenantId();
-    const existing = await this.findUserInTenant(id, tenantId);
+    await this.findUserInTenant(id, tenantId);
     const passwordHash = updateUserDto.password
       ? await this.passwordService.hash(updateUserDto.password)
       : undefined;
@@ -151,27 +169,54 @@ export class UsersService {
     }
 
     try {
-      const user = await this.prisma.$transaction(async (transaction) => {
-        await transaction.user.update({
-          where: { id: existing.id },
-          data: {
-            name: updateUserDto.name,
-            email: updateUserDto.email,
-            passwordHash,
-            status: updateUserDto.status,
-          },
-        });
-        if (updateUserDto.roleId) {
-          await transaction.userTenant.update({
-            where: { userId_tenantId: { userId: id, tenantId } },
-            data: { roleId: updateUserDto.roleId },
+      const user = await this.prisma.$transaction(
+        async (transaction) => {
+          const existing = await this.findUserInTenant(
+            id,
+            tenantId,
+            transaction,
+          );
+          const actor = this.tenantContext.getRequiredContext();
+          const identityUpdate = ['name', 'email', 'password', 'status'].some(
+            (key) => updateUserDto[key] !== undefined,
+          );
+          // User is a global identity. Tenant OWNER authority may only manage a local identity;
+          // membership role changes remain scoped to this tenant. Do not leak other memberships.
+          if (
+            actor.platformRole !== 'ADMIN' &&
+            actor.userId !== id &&
+            (existing.platformRole === 'ADMIN' ||
+              (identityUpdate &&
+                existing.userTenants.some((m) => m.tenantId !== tenantId)))
+          ) {
+            throw new ForbiddenException({
+              message:
+                'Global identity changes require platform administration',
+              details: { reason: 'GLOBAL_IDENTITY_PROTECTED' },
+            });
+          }
+          await transaction.user.update({
+            where: { id: existing.id },
+            data: {
+              name: updateUserDto.name,
+              email: updateUserDto.email,
+              passwordHash,
+              status: updateUserDto.status,
+            },
           });
-        }
-        return transaction.user.findUniqueOrThrow({
-          where: { id },
-          include: userInclude,
-        });
-      });
+          if (updateUserDto.roleId) {
+            await transaction.userTenant.update({
+              where: { userId_tenantId: { userId: id, tenantId } },
+              data: { roleId: updateUserDto.roleId },
+            });
+          }
+          return transaction.user.findUniqueOrThrow({
+            where: { id },
+            include: userInclude,
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
 
       return this.toResponse(user, tenantId);
     } catch (error) {
@@ -191,8 +236,9 @@ export class UsersService {
   private async findUserInTenant(
     id: string,
     tenantId: string,
+    transaction: Prisma.TransactionClient = this.prisma,
   ): Promise<UserWithTenants> {
-    const user = await this.prisma.user.findFirst({
+    const user = await transaction.user.findFirst({
       where: { id, userTenants: { some: { tenantId } } },
       include: userInclude,
     });

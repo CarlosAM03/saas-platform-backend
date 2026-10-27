@@ -53,14 +53,40 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User is inactive or does not exist');
     }
 
+    const platformRole = user.platformRole === 'ADMIN' ? 'ADMIN' : null;
+    if (platformRole !== payload.platformRole)
+      throw new UnauthorizedException('Authorization context changed');
+    let tenantRole: 'OWNER' | 'MEMBER' | null = null;
+    if (payload.tenantId !== null) {
+      if (platformRole === 'ADMIN') {
+        if (
+          !(await this.usersService.isTenantActiveForAuthentication(
+            payload.tenantId,
+          ))
+        )
+          throw new UnauthorizedException('Authorization context changed');
+      } else {
+        const membership = user.userTenants.find(
+          (m) => m.tenantId === payload.tenantId,
+        );
+        if (
+          !membership ||
+          membership.tenant.status !== 'ACTIVO' ||
+          membership.role.tenantId !== payload.tenantId ||
+          membership.role.name !== payload.tenantRole
+        )
+          throw new UnauthorizedException('Authorization context changed');
+        tenantRole = membership.role.name;
+      }
+    }
     const authenticatedUser = {
       id: user.id,
       email: user.email,
       name: user.name,
       status: user.status,
-      platformRole: payload.platformRole,
+      platformRole,
       tenantId: payload.tenantId,
-      tenantRole: payload.tenantRole,
+      tenantRole,
     };
     return authenticatedUser;
   }

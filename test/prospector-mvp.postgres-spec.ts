@@ -37,7 +37,8 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
     campaignA: string,
     campaignB: string,
     ownerId: string,
-    memberId: string;
+    memberId: string,
+    adminId: string;
   let owner: string, member: string, other: string, globalAdmin: string;
   let dispatch: jest.SpiedFunction<ProspectorClientService['startJob']>;
   let warn: jest.SpiedFunction<PinoLogger['warn']>,
@@ -191,17 +192,18 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
     );
     [tenantA, tenantB] = tenants.map((tenant) => tenant.id);
     const users = await Promise.all(
-      ['owner', 'member'].map(async (name) =>
+      ['owner', 'member', 'admin'].map(async (name) =>
         prisma.user.create({
           data: {
             name,
+            platformRole: name === 'admin' ? 'ADMIN' : null,
             email: randomUUID() + '@test.example',
             passwordHash: await passwordHash('IntegrationTest123!', 4),
           },
         }),
       ),
     );
-    [ownerId, memberId] = users.map((user) => user.id);
+    [ownerId, memberId, adminId] = users.map((user) => user.id);
     for (const tenantId of [tenantA, tenantB]) {
       const roles = await Promise.all(
         (['OWNER', 'MEMBER'] as const).map((name) =>
@@ -242,7 +244,7 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
     owner = token(ownerId, tenantA, 'OWNER');
     member = token(memberId, tenantA, 'MEMBER');
     other = token(ownerId, tenantB, 'OWNER');
-    globalAdmin = token(ownerId, null, null, 'ADMIN');
+    globalAdmin = token(adminId, null, null, 'ADMIN');
     dispatch = jest.spyOn(app.get(ProspectorClientService), 'startJob');
     await restartService('normal');
   });
@@ -274,7 +276,7 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
       await prisma.role.deleteMany({ where: { tenantId: { in: tenantIds } } });
       await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
       await prisma.user.deleteMany({
-        where: { id: { in: [ownerId, memberId].filter(Boolean) } },
+        where: { id: { in: [ownerId, memberId, adminId].filter(Boolean) } },
       });
       await prisma.$disconnect();
     }
@@ -702,6 +704,42 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
       definitiveRejection: false,
     });
   });
+  it('keeps a delayed callback in A after the same user selects B', async () => {
+    const job = await fixtureJob();
+    await post(event(job.id, 1, 'RUNNING')).expect(200);
+    const selected = data<{ accessToken: string }>(
+      await http()
+        .post('/api/v1/auth/select-tenant')
+        .set('Authorization', 'Bearer ' + owner)
+        .send({ tenantId: tenantB })
+        .expect(200),
+    );
+    const before = await prisma.prospectingJob.count({
+      where: { tenantId: tenantB },
+    });
+    const completed = event(job.id, 2, 'COMPLETED');
+    completed.results = [
+      {
+        name: 'Private delayed A result',
+        source: 'google_maps',
+        metadata: null,
+      },
+    ];
+    await post(completed).expect(200);
+    for (const suffix of ['', '/snapshot'])
+      await http()
+        .get('/api/v1/prospecting-jobs/' + job.id + suffix)
+        .set('Authorization', 'Bearer ' + selected.accessToken)
+        .expect(404);
+    expect((await detail(job.id)).status).toBe('COMPLETED');
+    expect(
+      await prisma.prospectingJob.count({ where: { tenantId: tenantB } }),
+    ).toBe(before);
+    expect(
+      (await prisma.prospectingJob.findUniqueOrThrow({ where: { id: job.id } }))
+        .tenantId,
+    ).toBe(tenantA);
+  });
   it('enforces live campaign and membership authority before allocating a Job', async () => {
     await prisma.campaign.update({
       where: { id: campaignA },
@@ -716,7 +754,7 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
       where: { id: tenantA },
       data: { status: 'SUSPENDIDO' },
     });
-    await create().expect(403);
+    await create().expect(401);
     await prisma.tenant.update({
       where: { id: tenantA },
       data: { status: 'ACTIVO' },
@@ -727,7 +765,7 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
     await prisma.userTenant.delete({
       where: { userId_tenantId: { userId: memberId, tenantId: tenantA } },
     });
-    await create('complete', randomUUID(), member).expect(403);
+    await create('complete', randomUUID(), member).expect(401);
     await prisma.userTenant.create({ data: membership });
     expect(dispatch).not.toHaveBeenCalled();
   });
