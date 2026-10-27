@@ -73,12 +73,7 @@ export class ProspectingJobsService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     if (this.policy.inspect().settings) await this.reconcile();
     this.timer = setInterval(() => {
-      const cleanup = this.policy.inspect().settings
-        ? this.reconcile()
-        : this.prisma.prospectingJobSnapshot.deleteMany({
-            where: { expiresAt: { lte: new Date() } },
-          });
-      void Promise.resolve(cleanup).catch(() =>
+      void this.reconcile(true).catch(() =>
         this.logger.warn('prospecting_maintenance_failed'),
       );
     }, 60000);
@@ -94,31 +89,33 @@ export class ProspectingJobsService implements OnModuleInit, OnModuleDestroy {
   }
   private async maintain(
     tx: Prisma.TransactionClient,
-    settings: ProspectorSettings,
+    settings: ProspectorSettings | null,
     now: Date,
   ): Promise<void> {
     await tx.prospectingJobSnapshot.deleteMany({
       where: { expiresAt: { lte: now } },
     });
-    const oldGeneration = {
-      dispatchState: { not: null },
-      capacityReleasedAt: null,
-      serviceGeneration: { not: settings.generation },
-    } satisfies Prisma.ProspectingJobWhereInput;
-    await tx.prospectingJob.updateMany({
-      where: { ...oldGeneration, status: { in: ACTIVE } },
-      data: {
-        status: 'FAILED',
-        completedAt: now,
-        failureCode: 'SERVICE_RESTARTED',
-        error:
-          'El servicio fue reiniciado. Puedes iniciar una búsqueda nueva manualmente.',
-      },
-    });
-    await tx.prospectingJob.updateMany({
-      where: oldGeneration,
-      data: { capacityReleasedAt: now },
-    });
+    if (settings) {
+      const oldGeneration = {
+        dispatchState: { not: null },
+        capacityReleasedAt: null,
+        serviceGeneration: { not: settings.generation },
+      } satisfies Prisma.ProspectingJobWhereInput;
+      await tx.prospectingJob.updateMany({
+        where: { ...oldGeneration, status: { in: ACTIVE } },
+        data: {
+          status: 'FAILED',
+          completedAt: now,
+          failureCode: 'SERVICE_RESTARTED',
+          error:
+            'El servicio fue reiniciado. Puedes iniciar una búsqueda nueva manualmente.',
+        },
+      });
+      await tx.prospectingJob.updateMany({
+        where: oldGeneration,
+        data: { capacityReleasedAt: now },
+      });
+    }
     await tx.prospectingJob.updateMany({
       where: {
         dispatchState: { not: null },
@@ -136,9 +133,9 @@ export class ProspectingJobsService implements OnModuleInit, OnModuleDestroy {
       },
     });
   }
-  async reconcile(): Promise<void> {
+  async reconcile(force = false): Promise<void> {
     const settings = this.policy.inspect().settings;
-    if (!settings || this.maintaining) return;
+    if ((!settings && !force) || this.maintaining) return;
     this.maintaining = true;
     try {
       await this.prisma.$transaction(async (tx) => {

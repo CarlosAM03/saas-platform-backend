@@ -113,7 +113,7 @@ Snapshot PostgreSQL del callback COMPLETED, límite configurable por Job hasta1M
 hasta100MiB, bajo mismo lock; TTL adoptado por Backend de3600s desde recepción final.
 COMPLETED [] está disponible. Vencido: resultsAvailable=false, results=null, fecha persiste.
 Lecturas/mantenimiento retiran snapshots vencidos; intervalo60s independiente de admisión
-limpia incluso con política retirada. Historia de Job/receipts permanece. Reiniciar Backend
+limpia incluso con política retirada y cierra deadlines persistidos sin liberar su reserva incierta. Historia de Job/receipts permanece. Reiniciar Backend
 conserva snapshots vigentes. No reconstruir desde Prospect/CampaignProspect ni guardarlos allí.
 
 ## 12. Fallos y reinicios
@@ -145,7 +145,7 @@ No se ejecutó hosting ni scraping público. Sin configuración completa la crea
 Engine247 PASS +1 E2E público deseleccionado; Service94 PASS, browser probe compatible.
 Primer intento browser falló por MAX_PATH; alias P: y PLAYWRIGHT_BROWSERS_PATH corto
 permitieron probe real sin cambios. Backend61 unit,77 HTTP/fake-Prisma regresión,
-28 PostgreSQL (incluye18 HTTP real MVP +10 CRUD/CSV) PASS en ejecución local.
+29 PostgreSQL (incluye19 HTTP real MVP +10 CRUD/CSV) PASS en ejecución local.
 Se probaron aceptación/callbacks COMPLETED/FAILED, vacíos, secuencia/duplicados/conflictos,
 callbacks antes de202, timeout, callback fallido, 401 real/409 real Service, rechazo503
 cliente HTTP, red/redirect, cuotas/concurrencia, aislamiento, rollback, constraints, TTL,
@@ -186,3 +186,15 @@ Commits separados de Flutter y sin push. Manifiesto posterior fija SHA exacto de
 Gate1 y gate2 funcionales con Service real/EnginePort controlado y PostgreSQL real.
 INTEGRACIÓN FUNCIONAL CON LIMITACIONES al terminar esta etapa: falta validar Flutter
 antes del dictamen global. Cancel/persist/export quedan deshabilitados y admisión off por defecto.
+
+## Evidencia adicional del cierre
+
+Se ejecutó SwaggerModule.createDocument sobre la aplicación Nest real y se contrastó
+con el documento servido por HTTP. platform-api.runtime-generated.json y
+platform-api.served.json son artefactos extraídos; platform-api.runtime-diff.json
+registra las diferencias. Los decoradores no describen completamente propiedades,
+errores ni la indisponibilidad: contienen 2xx por defecto para cancel/persist/export.
+El YAML servido elimina esos éxitos ficticios; las pruebas HTTP verifican 503.
+El saludo autenticado raíz y callback interno no son recursos Flutter.
+Último gate:61 unit,77 HTTP regresión,29 PostgreSQL; tipos/build PASS.
+Se agregó prueba de deadlines/snapshots con la configuración de admisión retirada.

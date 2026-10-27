@@ -15,7 +15,7 @@ import { GlobalExceptionFilter } from '../src/common/filters/global-exception.fi
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { LoggingInterceptor } from '../src/common/interceptors/logging.interceptor';
 import { PinoLogger } from 'nestjs-pino';
-import { SwaggerModule, OpenAPIObject } from '@nestjs/swagger';
+import { SwaggerModule, DocumentBuilder, OpenAPIObject } from '@nestjs/swagger';
 import { deploymentDocument } from '../src/common/openapi/deployment-document';
 import { policyFixture } from './support/prospector-policy.fixture';
 import { startControlledService } from './support/service-process';
@@ -596,6 +596,34 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
     const spec = (await http().get('/api/docs-json').expect(200))
       .body as OpenAPIObject;
     expect(spec.info.version).toBe('1.1.0');
+    const generated = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder()
+        .setTitle('Runtime route inventory')
+        .setVersion('1.1.0')
+        .addBearerAuth()
+        .build(),
+    );
+    expect(
+      generated.paths['/api/v1/prospecting-jobs'].post!.responses['201'],
+    ).toBeDefined();
+    expect(
+      generated.paths['/api/v1/prospecting-jobs/capabilities'].get!.responses[
+        '200'
+      ],
+    ).toBeDefined();
+    expect(
+      generated.paths['/api/v1/internal/prospecting-jobs/{jobId}/events'].post!
+        .responses['200'],
+    ).toBeDefined();
+    writeFileSync(
+      'Docs/Contracts/platform-api.runtime-generated.json',
+      JSON.stringify(generated, null, 2) + '\n',
+    );
+    writeFileSync(
+      'Docs/Contracts/platform-api.served.json',
+      JSON.stringify(spec, null, 2) + '\n',
+    );
     mkdirSync('.tmp', { recursive: true });
     writeFileSync(
       '.tmp/platform-api.served.json',
@@ -766,6 +794,33 @@ describe('MVP: real NestJS ↔ FastAPI ↔ controlled EnginePort ↔ PostgreSQL'
     });
     expect(dispatch).toHaveBeenCalledTimes(1);
     await restartService('normal');
+  });
+
+  it('expires durable deadlines and snapshots even after admission configuration is removed', async () => {
+    const completed = await fixtureJob();
+    await post(event(completed.id, 3, 'COMPLETED')).expect(200);
+    await prisma.prospectingJobSnapshot.update({
+      where: { jobId: completed.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+    const orphan = await fixtureJob();
+    await prisma.prospectingJob.update({
+      where: { id: orphan.id },
+      data: { deadlineAt: new Date(Date.now() - 1000) },
+    });
+    config.set('PROSPECTOR_BUDGET_APPROVED', 'false');
+    await jobs.reconcile(true); // same maintenance entry point used by the periodic timer
+    expect(await detail(orphan.id)).toMatchObject({
+      status: 'FAILED',
+      failureCode: 'FINAL_EVENT_TIMEOUT',
+      retryAllowed: false,
+    });
+    expect(
+      await prisma.prospectingJobSnapshot.count({
+        where: { jobId: completed.id },
+      }),
+    ).toBe(0);
+    expect(dispatch).not.toHaveBeenCalled();
   });
   it('does not write internal credentials into Backend logs', () => {
     const output = JSON.stringify([warn.mock.calls, publicWarn.mock.calls]);

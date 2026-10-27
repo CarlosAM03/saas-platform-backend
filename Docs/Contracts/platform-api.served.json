@@ -1,0 +1,3273 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Platform API",
+    "version": "1.1.0",
+    "description": "Contrato HTTP V1 entre Flutter y Platform Backend. Los DTOs son independientes\nde Prisma; el tenant se resuelve desde el contexto autenticado.\nAuth, Users, Health, Tenants, Campaigns, Prospects y CSV están implementados.\nJobs ofrece creación condicionada por política/readiness/cuotas y snapshots TTL una hora.\nCancelar, persistir y exportar Jobs están deshabilitados.\n"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Tenants"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Campaigns"
+    },
+    {
+      "name": "Prospects"
+    },
+    {
+      "name": "Prospecting Jobs"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HealthResponse"
+          }
+        }
+      }
+    },
+    "/api/v1/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "operationId": "liveness",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HealthResponse"
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "operationId": "readiness",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HealthResponse"
+          },
+          "503": {
+            "description": "PostgreSQL no disponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "summary": "Inicia sesión",
+        "operationId": "login",
+        "description": "JWT HS256 de 8h; máximo 5 intentos/60s/IP. Sin refresh token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/LoginResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "description": "Límite de autenticación excedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Cierra la sesión actual",
+        "operationId": "logout",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EmptySuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/select-tenant": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Selecciona el tenant de la sesión",
+        "operationId": "selectTenant",
+        "description": "Valida membership activa o autoridad global ADMIN. ADMIN conserva tenantRole null.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectTenantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tenant seleccionado y contexto actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAuthContext"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Obtiene la identidad y contexto actuales",
+        "operationId": "getCurrentUser",
+        "description": "Devuelve el token presentado sin renovarlo y el contexto autenticado. No requiere tenant seleccionado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contexto autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAuthContext"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants": {
+      "get": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "Lista los tenants accesibles al usuario",
+        "operationId": "listTenants",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenants del usuario autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Tenant"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "Crea un tenant",
+        "operationId": "createTenant",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tenant creado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Tenant"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{id}": {
+      "get": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "Obtiene un tenant",
+        "operationId": "getTenant",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Tenant"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Lista usuarios del tenant autenticado",
+        "operationId": "listUsers",
+        "description": "Requiere tenant seleccionado incluso para ADMIN. sortBy admite name, email, status, createdAt y updatedAt.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Search"
+          },
+          {
+            "$ref": "#/components/parameters/SortBy"
+          },
+          {
+            "$ref": "#/components/parameters/SortOrder"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/UserPage"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Crea un usuario y lo asocia al contexto actual",
+        "operationId": "createUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuario creado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/User"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Obtiene un usuario",
+        "operationId": "getUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/User"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Actualiza parcialmente un usuario",
+        "description": "Campo omitido no se modifica; null solo es válido para campos anulables.",
+        "operationId": "updateUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usuario actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/User"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "ADMIN desactiva un usuario del tenant seleccionado estableciendo INACTIVO. No realiza borrado físico.",
+        "operationId": "deleteUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EmptySuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns": {
+      "get": {
+        "tags": [
+          "Campaigns"
+        ],
+        "summary": "Lista campañas del tenant autenticado",
+        "operationId": "listCampaigns",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Search"
+          },
+          {
+            "$ref": "#/components/parameters/SortBy"
+          },
+          {
+            "$ref": "#/components/parameters/SortOrder"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CampaignPage"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Campaigns"
+        ],
+        "summary": "Crea una campaña en el tenant actual",
+        "operationId": "createCampaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCampaignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Campaña creada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Campaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CampaignId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Campaigns"
+        ],
+        "summary": "Obtiene una campaña",
+        "operationId": "getCampaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaña encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Campaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Campaigns"
+        ],
+        "summary": "Actualiza parcialmente una campaña",
+        "description": "Campo omitido no se modifica; null solo es válido para description.",
+        "operationId": "updateCampaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCampaignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Campaña actualizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Campaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Campaigns"
+        ],
+        "summary": "Archiva o elimina físicamente una campaña",
+        "description": "Sin permanent archiva; permanent=true queda reservado a ADMIN para borrado físico.",
+        "operationId": "deleteCampaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "permanent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EmptySuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/prospects": {
+      "get": {
+        "tags": [
+          "Campaigns",
+          "Prospects"
+        ],
+        "summary": "Lista prospectos de una campaña",
+        "operationId": "listCampaignProspects",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CampaignId"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Search"
+          },
+          {
+            "$ref": "#/components/parameters/SortBy"
+          },
+          {
+            "$ref": "#/components/parameters/SortOrder"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ProspectPage"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/prospects": {
+      "post": {
+        "tags": [
+          "Prospects"
+        ],
+        "summary": "Crea un prospecto manual",
+        "description": "Disponible para ADMIN y OWNER con una organización seleccionada.\nLa campaña debe pertenecer a esa organización.\nEl backend asigna source=manual y sourceIdentifier=null.\n",
+        "operationId": "createProspect",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProspectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Prospecto creado y asociado a la campaña.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Prospect"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Prospects"
+        ],
+        "summary": "Lista prospectos del tenant autenticado",
+        "operationId": "listProspects",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Search"
+          },
+          {
+            "$ref": "#/components/parameters/SortBy"
+          },
+          {
+            "$ref": "#/components/parameters/SortOrder"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ProspectPage"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/prospects/import/preview": {
+      "post": {
+        "tags": [
+          "Prospects"
+        ],
+        "operationId": "previewProspectImport",
+        "summary": "Previsualiza una importación CSV sin escrituras",
+        "description": "ADMIN y OWNER con tenant seleccionado. UTF-8 con/sin BOM, coma o punto y coma;\nencabezados exactos name,category,address,phone,email,website,language,status.\nname obligatorio. Máximo 5 MB, 1000 registros y 2000 caracteres por celda.\nMáximo 5 MB de resultados de preview; dividir el archivo si se supera.\nNo admite metadata ni campos controlados por el backend. Las filas completamente\nvacías se ignoran. Registro lógico desde 1 después del encabezado; saltos dentro\nde comillas no crean registros. Columna nullable vacía equivale a null; ausente\nse conserva al actualizar. status vacío es inválido y ausente usa ACTIVO al crear.\nCandidatos por nombre en todo el tenant, ignorando mayúsculas y espacios sobrantes,\nconservando acentos y signos; no sustituye la identidad del baseline.\nTodos los nombres repetidos en el archivo son inválidos; varias coincidencias\nexistentes son conflicto. La referencia firmada vence en 15 minutos.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "campaignId",
+                  "file"
+                ],
+                "properties": {
+                  "campaignId": {
+                    "type": "string",
+                    "pattern": "^\\S+$",
+                    "maxLength": 200
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Previsualización; no guarda datos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ProspectImportPreview"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "description": "El archivo supera 5 MB."
+          }
+        }
+      }
+    },
+    "/api/v1/prospects/import/confirm": {
+      "post": {
+        "tags": [
+          "Prospects"
+        ],
+        "operationId": "confirmProspectImport",
+        "summary": "Confirma una importación CSV atómica",
+        "description": "ADMIN y OWNER con tenant seleccionado. Reenviar el mismo archivo del preview.\ndecisions es un array JSON codificado como texto multipart, con exactamente una\ndecisión por registro NEW o MATCH; no incluir registros INVALID ni CONFLICT.\nNEW admite CREATE o SKIP. MATCH admite LINK_EXISTING, UPDATE_EXISTING o SKIP.\nLINK_EXISTING solo asegura la asociación, sin editar ni reactivar una asociación\nexistente. UPDATE_EXISTING edita los campos importables presentes y asegura la\nasociación; requiere selección explícita y afecta a todas las campañas que\ncomparten el prospecto. Conserva metadata, origen e identificadores protegidos.\nSKIP no cambia atributos ni asociaciones. Todo se guarda en una transacción\nSerializable, hasta tres intentos ante conflictos de serialización.\nCambios en coincidencias, atributos o asociaciones desde el preview devuelven 409.\nNo existe idempotencia durable: repetir la confirmación reevalúa la base actual,\nno recupera el resultado anterior. Errores de infraestructura revierten todo el lote.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "campaignId",
+                  "file",
+                  "previewReference",
+                  "decisions"
+                ],
+                "properties": {
+                  "campaignId": {
+                    "type": "string",
+                    "pattern": "^\\S+$",
+                    "maxLength": 200
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "previewReference": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "decisions": {
+                    "type": "string",
+                    "maxLength": 100000,
+                    "example": "[{\"record\":1,\"action\":\"CREATE\"},{\"record\":2,\"action\":\"LINK_EXISTING\"}]"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado del lote confirmado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ProspectImportResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "description": "El archivo supera 5 MB."
+          }
+        }
+      }
+    },
+    "/api/v1/prospects/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EntityId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Prospects"
+        ],
+        "summary": "Obtiene un prospecto",
+        "operationId": "getProspect",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prospecto encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Prospect"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Prospects"
+        ],
+        "summary": "Actualiza parcialmente un prospecto",
+        "description": "Campo omitido no se modifica; null es válido en campos nullable.",
+        "operationId": "updateProspect",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProspectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prospecto actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Prospect"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/prospecting-jobs": {
+      "post": {
+        "tags": [
+          "Prospecting Jobs"
+        ],
+        "summary": "Crea y encola un Job de prospección",
+        "description": "Requiere tenant seleccionado y campaña ACTIVA del tenant; ADMIN/OWNER/MEMBER. Idempotencia PostgreSQL por tenant, usuario y hash de clave (1–200 bytes). Mismo payload devuelve el mismo Job; otro payload devuelve 409. Sin reenvío automático al Service. Deshabilitado por defecto; requiere política completa, presupuesto conservador aprobado, readiness y cupo. Una respuesta incierta devuelve 503 con details.reason=PROSPECTOR_DISPATCH_UNCERTAIN y details.jobId para consultar; conservar la clave y payload. 201 puede contener un estado avanzado por callbacks adelantados; nunca supone que el scraping haya terminado.",
+        "operationId": "createProspectingJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProspectingJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Aceptación confirmada; detalle efectivo del mismo Job, incluso en replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ProspectingJobDetail"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "description": "Cuota de tenant o global agotada; error.details.reason identifica el límite.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Prospecting Jobs"
+        ],
+        "summary": "Lista Jobs del tenant autenticado",
+        "operationId": "listProspectingJobs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "updatedAt",
+                "startedAt",
+                "completedAt",
+                "status",
+                "id"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/SortOrder"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JobPage"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/prospecting-jobs/capabilities": {
+      "get": {
+        "tags": [
+          "Prospecting Jobs"
+        ],
+        "summary": "Verifica habilitación actual para el tenant",
+        "operationId": "getProspectingCapabilities",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Comprobación actual de política, cuota, capacidad y readiness; POST revalida. Fallback seguro si falta la ruta. Nunca contiene claves ni URLs internas.",
+        "responses": {
+          "200": {
+            "description": "Capacidades efectivas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ProspectingCapabilities"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/prospecting-jobs/{id}": {
+      "get": {
+        "tags": [
+          "Prospecting Jobs"
+        ],
+        "summary": "Obtiene el detalle de un Job",
+        "description": "Snapshot PostgreSQL TTL una hora desde callback final; vencido resultsAvailable=false y results=null. progress=null. retryAllowed acredita liberación de reserva, nunca reintento automático.",
+        "operationId": "getProspectingJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalle durable; resultsAvailable=true sólo con snapshot COMPLETED vigente (incluye lista vacía).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ProspectingJobDetail"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/prospecting-jobs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Prospecting Jobs"
+        ],
+        "summary": "No disponible — cancel",
+        "operationId": "cancelProspectingJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          }
+        ],
+        "description": "Operación deshabilitada; no invoca ningún endpoint Service ni modifica prospectos.",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/prospecting-jobs/{id}/persist": {
+      "post": {
+        "tags": [
+          "Prospecting Jobs"
+        ],
+        "summary": "No disponible — persist",
+        "operationId": "persistProspectingJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          }
+        ],
+        "description": "Operación deshabilitada; no invoca ningún endpoint Service ni modifica prospectos.",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/prospecting-jobs/{id}/export": {
+      "get": {
+        "tags": [
+          "Prospecting Jobs"
+        ],
+        "summary": "No disponible — export",
+        "operationId": "exportProspectingJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EntityId"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ExportFormat"
+            }
+          }
+        ],
+        "description": "Operación deshabilitada; no invoca ningún endpoint Service ni modifica prospectos.",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "CampaignId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Identificador de campaña; admite CUID e identificadores del dataset local. La campaña debe pertenecer al tenant autenticado.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\\S+$"
+        }
+      },
+      "EntityId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Identificador persistente CUID.",
+        "schema": {
+          "type": "string",
+          "pattern": "^c[a-z0-9]{20,}$"
+        }
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        }
+      },
+      "Search": {
+        "name": "search",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SortBy": {
+        "name": "sortBy",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SortOrder": {
+        "name": "sortOrder",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "asc"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Misma key y mismo payload devuelve el mismo Job; misma key con payload distinto responde 409.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "responses": {
+      "HealthResponse": {
+        "description": "Proceso disponible; readiness incluye database up tras consultar PostgreSQL.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "status"
+                      ],
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "ok"
+                          ]
+                        },
+                        "database": {
+                          "type": "string",
+                          "enum": [
+                            "up"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Solicitud inválida.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Credenciales ausentes o inválidas.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Operación no permitida para el rol o tenant actual.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Recurso no encontrado en el tenant actual.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflicto de estado, unicidad o idempotencia.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Prospector Service no pudo aceptar el Job.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "EmptySuccess": {
+        "description": "Operación completada.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "maxProperties": 0
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "LoginResponse": {
+        "description": "Sesión iniciada.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SuccessAuthContext"
+            }
+          }
+        }
+      },
+      "UserPage": {
+        "description": "Usuarios paginados.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UserPageResponse"
+            }
+          }
+        }
+      },
+      "CampaignPage": {
+        "description": "Campañas paginadas.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CampaignPageResponse"
+            }
+          }
+        }
+      },
+      "ProspectPage": {
+        "description": "Prospectos paginados.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProspectPageResponse"
+            }
+          }
+        }
+      },
+      "JobPage": {
+        "description": "Jobs paginados.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/JobPageResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {},
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "Meta": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "error"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "details",
+          "timestamp"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC."
+          }
+        }
+      },
+      "Id": {
+        "type": "string",
+        "pattern": "^c[a-z0-9]{20,}$",
+        "description": "CUID persistente."
+      },
+      "DateTime": {
+        "type": "string",
+        "format": "date-time",
+        "description": "ISO 8601 UTC."
+      },
+      "TenantStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVO",
+          "SUSPENDIDO"
+        ]
+      },
+      "UserStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVO",
+          "INACTIVO"
+        ]
+      },
+      "RoleName": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "MEMBER"
+        ]
+      },
+      "CampaignStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVA",
+          "PAUSADA",
+          "COMPLETADA",
+          "ARCHIVADA"
+        ]
+      },
+      "ProspectStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVO",
+          "INACTIVO"
+        ]
+      },
+      "ProspectingJobStatus": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "CANCELLED"
+        ]
+      },
+      "Tenant": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TenantStatus"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        }
+      },
+      "Role": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RoleName"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "platformRole": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              null
+            ],
+            "nullable": true
+          },
+          "tenants": {
+            "type": "array",
+            "description": "Memberships visibles limitadas al tenant operativo.",
+            "items": {
+              "type": "object",
+              "required": [
+                "tenantId",
+                "tenantName",
+                "tenantSlug",
+                "role"
+              ],
+              "properties": {
+                "tenantId": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "tenantName": {
+                  "type": "string"
+                },
+                "tenantSlug": {
+                  "type": "string"
+                },
+                "role": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        },
+        "description": "passwordHash nunca se expone."
+      },
+      "Campaign": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/CampaignStatus"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        }
+      },
+      "Prospect": {
+        "type": "object",
+        "required": [
+          "id",
+          "campaignId",
+          "name",
+          "source",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "campaignId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "website": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "google_maps",
+              "manual",
+              "csv"
+            ]
+          },
+          "sourceIdentifier": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProspectStatus"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        }
+      },
+      "ProspectingCapabilities": {
+        "type": "object",
+        "required": [
+          "contractVersion",
+          "create",
+          "cancel",
+          "persist",
+          "export",
+          "reason",
+          "source",
+          "minLimit",
+          "maxLimit",
+          "resultsTtlSeconds"
+        ],
+        "properties": {
+          "contractVersion": {
+            "type": "string",
+            "enum": [
+              "prospector-mvp-v1"
+            ]
+          },
+          "create": {
+            "type": "boolean"
+          },
+          "cancel": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "persist": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "export": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "google_maps"
+            ]
+          },
+          "minLimit": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "maxLimit": {
+            "type": "integer",
+            "enum": [
+              100
+            ]
+          },
+          "resultsTtlSeconds": {
+            "type": "integer",
+            "enum": [
+              3600
+            ]
+          }
+        }
+      },
+      "ProspectingQuery": {
+        "type": "object",
+        "required": [
+          "keyword",
+          "location",
+          "source",
+          "limit"
+        ],
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "location": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "google_maps"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "PipelineProgress": {
+        "type": "object",
+        "nullable": true,
+        "required": [
+          "source",
+          "stage",
+          "message",
+          "percentage"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "google_maps"
+            ]
+          },
+          "stage": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "percentage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "description": "DTO de integración; no es persistencia."
+      },
+      "BusinessResult": {
+        "type": "object",
+        "required": [
+          "name",
+          "source"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "website": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "google_maps"
+            ]
+          },
+          "sourceIdentifier": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          }
+        },
+        "description": "DTO temporal de integración, no tabla ProspectingResult."
+      },
+      "ProspectingJobSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "campaignId",
+          "status",
+          "createdAt",
+          "startedAt",
+          "completedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "campaignId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProspectingJobStatus"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ProspectingJobDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProspectingJobSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "tenantId",
+              "requestedBy",
+              "query",
+              "requestedLimit",
+              "error",
+              "updatedAt",
+              "resultsAvailable",
+              "results",
+              "progress"
+            ],
+            "properties": {
+              "tenantId": {
+                "$ref": "#/components/schemas/Id"
+              },
+              "requestedBy": {
+                "$ref": "#/components/schemas/Id"
+              },
+              "query": {
+                "$ref": "#/components/schemas/ProspectingQuery"
+              },
+              "requestedLimit": {
+                "type": "integer",
+                "nullable": true
+              },
+              "error": {
+                "type": "string",
+                "nullable": true
+              },
+              "updatedAt": {
+                "$ref": "#/components/schemas/DateTime"
+              },
+              "resultsAvailable": {
+                "type": "boolean",
+                "description": "Snapshot COMPLETED vigente; lista vacía también disponible."
+              },
+              "results": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "$ref": "#/components/schemas/BusinessResult"
+                },
+                "description": "Snapshot PostgreSQL acotado, TTL una hora; no son prospectos guardados en campaña."
+              },
+              "progress": {
+                "type": "object",
+                "nullable": true,
+                "enum": [
+                  null
+                ],
+                "description": "Service actual no emite porcentaje."
+              },
+              "resultsExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "dispatchState": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "PENDING",
+                  "ACCEPTED",
+                  "UNCERTAIN",
+                  "REJECTED",
+                  null
+                ]
+              },
+              "failureCode": {
+                "type": "string",
+                "nullable": true
+              },
+              "retryAllowed": {
+                "type": "boolean",
+                "description": "Nueva intención manual sólo tras fallo confirmado o reserva liberada."
+              }
+            }
+          }
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          }
+        }
+      },
+      "SelectTenantRequest": {
+        "type": "object",
+        "required": [
+          "tenantId"
+        ],
+        "properties": {
+          "tenantId": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      },
+      "AuthContext": {
+        "type": "object",
+        "required": [
+          "accessToken",
+          "user",
+          "tenants",
+          "currentTenantId"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          },
+          "tenants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthTenant"
+            }
+          },
+          "currentTenantId": {
+            "type": "string",
+            "pattern": "^c[a-z0-9]{20,}$",
+            "nullable": true
+          }
+        }
+      },
+      "SuccessAuthContext": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/AuthContext"
+              }
+            }
+          }
+        ]
+      },
+      "AuthUser": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "platformRole",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "platformRole": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              null
+            ],
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        }
+      },
+      "AuthTenant": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TenantStatus"
+          }
+        }
+      },
+      "CreateTenantRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "slug"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "description": "roleId es opcional; se utiliza MEMBER del tenant autenticado si se omite (plan F4, bloque 5).",
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          },
+          "roleId": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      },
+      "UpdateUserRequest": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          },
+          "roleId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          }
+        }
+      },
+      "CreateCampaignRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateCampaignRequest": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/CampaignStatus"
+          }
+        }
+      },
+      "ProspectImportValues": {
+        "type": "object",
+        "description": "Valores leídos del CSV; las filas INVALID pueden conservar celdas de más de 2000 caracteres y reportar el error correspondiente.",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "website": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ]
+          }
+        }
+      },
+      "ProspectImportErrors": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "field",
+            "message"
+          ],
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ProspectImportPreview": {
+        "type": "object",
+        "required": [
+          "previewReference",
+          "expiresAt",
+          "summary",
+          "rows"
+        ],
+        "properties": {
+          "previewReference": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "new": {
+                "type": "integer"
+              },
+              "matches": {
+                "type": "integer"
+              },
+              "invalid": {
+                "type": "integer"
+              },
+              "conflicts": {
+                "type": "integer"
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "type": "object",
+              "properties": {
+                "record": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "classification": {
+                  "type": "string",
+                  "enum": [
+                    "NEW",
+                    "MATCH",
+                    "INVALID",
+                    "CONFLICT"
+                  ]
+                },
+                "values": {
+                  "$ref": "#/components/schemas/ProspectImportValues"
+                },
+                "errors": {
+                  "$ref": "#/components/schemas/ProspectImportErrors"
+                },
+                "matches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "campaignIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "sharedWithOtherCampaigns": {
+                        "type": "boolean"
+                      },
+                      "differences": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "field": {
+                              "type": "string"
+                            },
+                            "existing": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "imported": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ProspectImportResult": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "created": {
+                "type": "integer"
+              },
+              "linked": {
+                "type": "integer"
+              },
+              "updated": {
+                "type": "integer"
+              },
+              "skipped": {
+                "type": "integer"
+              },
+              "rejected": {
+                "type": "integer"
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "record": {
+                  "type": "integer"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "CREATE",
+                    "LINK_EXISTING",
+                    "UPDATE_EXISTING",
+                    "SKIP",
+                    "REJECTED"
+                  ]
+                },
+                "prospectId": {
+                  "type": "string"
+                },
+                "errors": {
+                  "$ref": "#/components/schemas/ProspectImportErrors"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CreateProspectRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "campaignId",
+          "name"
+        ],
+        "properties": {
+          "campaignId": {
+            "type": "string",
+            "pattern": "^\\S+$",
+            "description": "Identificador de campaña; debe existir en el tenant actual."
+          },
+          "name": {
+            "type": "string",
+            "pattern": "\\S",
+            "description": "Nombre obligatorio; no puede contener solamente espacios."
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "website": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "URL con protocolo, por ejemplo https://ejemplo.com."
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVO",
+              "INACTIVO"
+            ],
+            "default": "ACTIVO"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          }
+        }
+      },
+      "UpdateProspectRequest": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "website": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProspectStatus"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          }
+        }
+      },
+      "CreateProspectingJobRequest": {
+        "type": "object",
+        "required": [
+          "campaignId",
+          "query"
+        ],
+        "properties": {
+          "campaignId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "query": {
+            "$ref": "#/components/schemas/ProspectingQuery"
+          }
+        }
+      },
+      "PersistResultsResult": {
+        "type": "object",
+        "required": [
+          "persisted",
+          "skipped"
+        ],
+        "properties": {
+          "persisted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ExportFormat": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "xlsx"
+        ]
+      },
+      "UserPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/User"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/PaginationMeta"
+              }
+            }
+          }
+        ]
+      },
+      "CampaignPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/PaginationMeta"
+              }
+            }
+          }
+        ]
+      },
+      "ProspectPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Prospect"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/PaginationMeta"
+              }
+            }
+          }
+        ]
+      },
+      "JobPageResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ProspectingJobSummary"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/PaginationMeta"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
