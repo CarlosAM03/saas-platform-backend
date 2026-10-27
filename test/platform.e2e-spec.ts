@@ -546,4 +546,26 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
     }
     expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
   });
+  it('SEC-01 protects a shared global identity while allowing tenant-local membership changes', async () => {
+    const token = (await login('owner@example.com')).body.data.accessToken;
+    const before = fake._state.users.find((u) => u.id === 'user-multi')!.name;
+    const denied = await request(app.getHttpServer())
+      .patch('/api/v1/users/user-multi')
+      .set('Authorization', 'Bearer ' + token)
+      .send({ name: 'Must not affect B' });
+    expect(denied.status).toBe(403);
+    expect(fake._state.users.find((u) => u.id === 'user-multi')!.name).toBe(
+      before,
+    );
+    const changed = await request(app.getHttpServer())
+      .patch('/api/v1/users/user-multi')
+      .set('Authorization', 'Bearer ' + token)
+      .send({ roleId: 'role-a-owner' });
+    expect(changed.status).toBe(200);
+    expect(
+      fake._state.userTenants.find(
+        (m) => m.userId === 'user-multi' && m.tenantId === 'tenant-b',
+      )!.roleId,
+    ).toBe('role-b-owner');
+  });
 });

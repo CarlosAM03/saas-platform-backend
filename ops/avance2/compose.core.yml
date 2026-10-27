@@ -1,0 +1,119 @@
+name: prospector-avance2-core
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: saas_local
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD}
+      POSTGRES_DB: avance2_core
+    volumes: [core-pg:/var/lib/postgresql/data]
+    ports: ['127.0.0.1:55447:5432']
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U saas_local -d avance2_core']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  init:
+    image: prospector-avance2-backend:core
+    environment:
+      DATABASE_URL: postgresql://saas_local:${LOCAL_DB_PASSWORD}@db:5432/avance2_core
+      DATABASE_ENV: local
+      DEV_SEED_PASSWORD: ${LOCAL_DEMO_PASSWORD}
+    command:
+      [sh, -c, 'npm run prisma:migrate:deploy && node dist/Prisma/seed_dev.js']
+    depends_on:
+      db: { condition: service_healthy }
+  api:
+    image: prospector-avance2-backend:core
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://saas_local:${LOCAL_DB_PASSWORD}@db:5432/avance2_core
+      DATABASE_ENV: local
+      PORT: '3000'
+      JWT_SECRET: ${LOCAL_JWT_SECRET}
+      JWT_EXPIRES_IN: 8h
+      CORS_ORIGINS: https://localhost:18443
+    ports: ['127.0.0.1:18441:3000']
+    depends_on:
+      init: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "require('http').get('http://127.0.0.1:3000/api/v1/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+  web:
+    image: prospector-avance2-flutter:core-local
+    environment: { PORT: '80' }
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1/]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+  tls-init:
+    image: prospector-avance2-backend:core
+    user: root
+    entrypoint: [sh, /ops/init-tls.sh]
+    volumes: ['./init-tls.sh:/ops/init-tls.sh:ro', 'core-tls:/certs']
+  gateway:
+    image: nginx:1.28.0-alpine
+    ports: ['127.0.0.1:18443:18443', '127.0.0.1:18450:6080']
+    volumes:
+      [
+        './nginx-https.conf:/etc/nginx/conf.d/default.conf:ro',
+        'core-tls:/certs:ro',
+      ]
+    depends_on:
+      tls-init: { condition: service_completed_successfully }
+      api: { condition: service_healthy }
+      web: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD,
+          curl,
+          --fail,
+          --silent,
+          --cacert,
+          /certs/ca.crt,
+          https://localhost:18443/,
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+  browser:
+    build: { context: ., dockerfile: Dockerfile.browser }
+    image: prospector-avance2-browser:trusted-local
+    network_mode: service:gateway
+    volumes:
+      [
+        'core-tls:/certs:ro',
+        '${LOCAL_EVIDENCE_DIR}:/evidence',
+        './browser_agent.py:/opt/browser_agent.py:ro',
+        './start-browser.sh:/opt/start-browser.sh:ro',
+      ]
+    environment: { START_URL: 'https://localhost:18443/' }
+    depends_on:
+      gateway: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD,
+          python,
+          -c,
+          "import socket; socket.create_connection(('127.0.0.1',6090),3).close()",
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+    shm_size: 1gb
+volumes:
+  core-pg:
+    labels: { prospector.owner: avance2-core-exclusive }
+  core-tls:
+    labels: { prospector.owner: avance2-core-exclusive }
