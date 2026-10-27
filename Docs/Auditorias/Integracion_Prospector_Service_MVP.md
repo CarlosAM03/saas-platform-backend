@@ -11,7 +11,7 @@ src/Dockerfile/pyproject idénticos a main, sin cambios. Engine instalado en Pyt
 Service desde VCS 70f6081 (direct_url.json); Python 3.13.4.
 Backend base origin/dev 967044e2dc7d10ea91d7d78a86e1ea6fe2accd1a,
 main 3a3309398458ab333d7b00f16e9c2df6a09ef734 con árbol idéntico y CSV presente.
-Rama aislada feat/prospector-service-mvp-integration. SHA de implementación:
+Rama aislada feat/prospector-service-mvp-integration. SHA de implementación inicial:
 d19b78afef8148a41f69397f6fdbc5ef70c5f912. El manifiesto contractual fija ese SHA y el hash del YAML.
 Flutter autoridad fix/f5-foundation 97645e4a9abcfb52121d74e2b1d6f5a14a73e3ef;
 sin cambios funcionales hasta pasar gate 2.
@@ -166,7 +166,7 @@ Cuotas globales suponen misma BD/Service y todos los productores pasan por este 
 
 Backend↔FastAPI↔EnginePort controlado↔callback↔PostgreSQL↔GET verificado.
 Engine real se validó por suites separadas con browser probe, no Google Maps live.
-Recorrido Flutter pendiente al cerrar etapa I; gate4 se documentará en reporte Flutter.
+El recorrido Flutter se validó al cerrar etapa II; ver evidencia final y reporte Flutter.
 No llamar E2E Google Maps a fixtures controlados.
 
 ## 17. Reproducción y commits
@@ -184,8 +184,9 @@ Commits separados de Flutter y sin push. Manifiesto posterior fija SHA exacto de
 ## 18. Dictamen etapa I
 
 Gate1 y gate2 funcionales con Service real/EnginePort controlado y PostgreSQL real.
-INTEGRACIÓN FUNCIONAL CON LIMITACIONES al terminar esta etapa: falta validar Flutter
-antes del dictamen global. Cancel/persist/export quedan deshabilitados y admisión off por defecto.
+INTEGRACIÓN FUNCIONAL CON LIMITACIONES. El cierre global incluye el recorrido Flutter
+con EnginePort controlado; Docker/builds nativos/Google Maps live no se validaron.
+Cancel/persist/export quedan deshabilitados y admisión off por defecto.
 
 ## Evidencia adicional del cierre
 
@@ -198,3 +199,18 @@ El YAML servido elimina esos éxitos ficticios; las pruebas HTTP verifican 503.
 El saludo autenticado raíz y callback interno no son recursos Flutter.
 Último gate:61 unit,77 HTTP regresión,29 PostgreSQL; tipos/build PASS.
 Se agregó prueba de deadlines/snapshots con la configuración de admisión retirada.
+
+## Versiones verificadas y cierre global
+
+Backend funcional final **b6cd40f5c00990411bd6f46a22991c9be60de4bf**. Flutter funcional **9a766c2a5d06dd90561ef5594ebcbdb807874beb**,
+base97645e4. El commit documental posterior no modifica su código funcional.
+E2E real repetido contra Backend final: Auth/cliente tipado/Riverpod Flutter → NestJS
+→ FastAPI → EnginePort controlado → callback → PostgreSQL → GET → Flutter PASS,
+COMPLETED/FAILED/COMPLETED vacío, replay/conflicto, CSV/manual, aislamiento y logout.
+Flutter264 tests PASS, analyze PASS, Web release PASS; gates1–4 satisfechos en ese alcance.
+No navegador interactivo completo ni Google Maps live. Evidencia sin credenciales en
+Evidencia_Prospector_Stack_MVP.json y reporte Flutter.
+Se cerraron los procesos propietarios, se verificó el borrado de sus tenants fixture
+y se detuvo sólo PostgreSQL temporal55439. La instancia existente5432 no se tocó.
+Commits Backend: d19b78a integración; b37fb92 arnés/contrato; b6cd40f mantenimiento/OpenAPI;
+commit final de documentación contiene esta constancia. Sin push, merge ni despliegue.
