@@ -1,0 +1,233 @@
+{
+  "cutUtc": "2026-10-27 09:54:15 UTC",
+  "timezone": "America/Tijuana",
+  "targetPresentation": "2026-10-27 19:00 America/Tijuana",
+  "scope": "Controlled MVP acceptance; no dev/main merge, approval, release or manual production deployment",
+  "verdict": {
+    "core": "APTO PARA AUDITORÍA FINAL",
+    "production": "PENDIENTE DE VALIDACIONES",
+    "service": "INTEGRACIÓN INICIAL VALIDADA en entorno controlado; despliegue externo no certificado"
+  },
+  "repositories": {
+    "engine": {
+      "branch": "main",
+      "sha": "70f6081688db5c5bc5ea612f5fabd5724aab0b20",
+      "modified": false
+    },
+    "service": {
+      "branch": "feat/fastapi-service-foundation",
+      "sha": "69c54a15601d238638610d0a5c08af46e3da7f14",
+      "originMain": "566bbbe67a59a0fda307ea7d8c5f6bf46fd93aab",
+      "srcMatchesOriginMain": true,
+      "modified": false
+    },
+    "backend": {
+      "branch": "feat/prospector-service-mvp-integration",
+      "codeSha": "42b96fefd73cc11b42ecde4df6d5f42393328bfc",
+      "initialSha": "91470dcb8bf8e8121978fd8fb455588583ea1ecc",
+      "pr": "https://github.com/CarlosAM03/saas-platform-backend/pull/6",
+      "base": "dev",
+      "documentationCommit": "Containing commit; final HEAD and its checks recorded in Draft PR #6"
+    },
+    "flutterFoundation": {
+      "branch": "fix/f5-foundation",
+      "sha": "095e899ace31acf17d97bbe945c118c1a5d88682",
+      "pr": "https://github.com/CarlosAM03/saas-platform-client/pull/7",
+      "base": "dev"
+    },
+    "flutterParity": {
+      "branch": "feat/flutter-prospector-mvp-parity",
+      "sha": "97ad02a621007e4139e5207511ecca2376754ed8",
+      "pr": "https://github.com/CarlosAM03/saas-platform-client/pull/8",
+      "base": "fix/f5-foundation",
+      "finalTarget": "dev after Foundation"
+    }
+  },
+  "contract": {
+    "publicVersion": "1.1.0",
+    "publicPath": "Docs/Contracts/platform-api.v1.yaml",
+    "capabilities": "prospector-mvp-v1",
+    "internalContractModified": false
+  },
+  "security": {
+    "p0FindingsCorrected": [
+      "Live authorization after membership/role/platform/tenant change",
+      "Tenant OWNER cannot overwrite another shared identity or ADMIN identity",
+      "Root dialogs discard stale context on tenant/session change"
+    ],
+    "backendRedTestsBeforeFix": 5,
+    "flutterRedTestsBeforeFix": 3,
+    "knownReproducibleLeaksAfterFix": 0,
+    "previousValidTenantAToken": "Remains scoped to A; selecting B is not global session revocation",
+    "productionJwtMinimumLength": 32
+  },
+  "tests": {
+    "backendUnit": {
+      "passed": 68
+    },
+    "backendHttp": {
+      "passed": 77
+    },
+    "backendPostgres": {
+      "passed": 46,
+      "realDatabase": true
+    },
+    "foundationFlutter": {
+      "passed": 255
+    },
+    "parityFlutter": {
+      "passed": 267,
+      "explicitIntegrationsSkippedInDefaultRun": 2
+    },
+    "realCoreFlutter": {
+      "passed": 1,
+      "productionEntrypoint": "dist/src/main.js",
+      "nodeEnv": "production",
+      "envFile": false,
+      "serviceCredentials": false,
+      "httpDependencyFetchCalls": 0,
+      "csvCreated": 600,
+      "dashboardProspects": 601,
+      "replayStatus": 409,
+      "crossTenantStatus": 404,
+      "generationStatus": 503,
+      "fictionalJobs": 0
+    },
+    "realServiceFlutter": {
+      "passed": 1,
+      "fastApi": true,
+      "enginePort": "controlled",
+      "publicExtraction": false
+    },
+    "lint": true,
+    "format": true,
+    "typecheck": true,
+    "backendBuild": true,
+    "flutterBuildRunner": true,
+    "flutterAnalyze": true,
+    "flutterWebRelease": true,
+    "npmAuditVulnerabilities": 0,
+    "localNode": "22.16.0",
+    "ciNode": "20"
+  },
+  "remoteCI": {
+    "backendCode": {
+      "sha": "42b96fefd73cc11b42ecde4df6d5f42393328bfc",
+      "run": 40481064364,
+      "conclusion": "success",
+      "url": "https://github.com/CarlosAM03/saas-platform-backend/actions/runs/40481064364",
+      "jobs": [
+        "quality",
+        "postgres-integration",
+        "docker-build"
+      ]
+    },
+    "flutterFoundation": {
+      "sha": "095e899ace31acf17d97bbe945c118c1a5d88682",
+      "run": 40480231249,
+      "conclusion": "success",
+      "url": "https://github.com/CarlosAM03/saas-platform-client/actions/runs/40480231249"
+    },
+    "flutterParity": [
+      {
+        "sha": "97ad02a621007e4139e5207511ecca2376754ed8",
+        "run": 40483626521,
+        "name": "Prospector controlled HTTP integration",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/CarlosAM03/saas-platform-client/actions/runs/40483626521"
+      },
+      {
+        "sha": "97ad02a621007e4139e5207511ecca2376754ed8",
+        "run": 40483626538,
+        "name": "Core MVP without Prospector Service",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/CarlosAM03/saas-platform-client/actions/runs/40483626538"
+      },
+      {
+        "sha": "97ad02a621007e4139e5207511ecca2376754ed8",
+        "run": 40483626476,
+        "name": "Flutter Foundation CI",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/CarlosAM03/saas-platform-client/actions/runs/40483626476"
+      }
+    ],
+    "earlierFailures": "Preserved: Backend dependency advisories fixed; integration Flutter workflows needed build_runner in clean checkout; unused test import removed. No checks disabled."
+  },
+  "docker": {
+    "local": "not available; not executed",
+    "backendRemoteBuild": "passed",
+    "backendContainerStartupSmoke": "not executed",
+    "flutterRemoteComposeBuild": "passed",
+    "flutterRemoteProductionBuildAndSpaSmoke": "passed"
+  },
+  "csvRealPrivateReview": {
+    "sources": 6,
+    "format": "XLSX OOXML Businesses A:G, all populated cells text",
+    "originalRows": 486,
+    "compatible": 422,
+    "invalid": 64,
+    "repeatedNormalizedNameRows": 64,
+    "requiresReview": 64,
+    "eligibleSyntaxOnly": 422,
+    "combinedCandidateBytes": 76636,
+    "candidateEncoding": "UTF-8",
+    "formulas": 0,
+    "blankRows": 0,
+    "originalsUnchanged": true,
+    "realContactsImported": false,
+    "originalOrCandidatesPublished": false,
+    "deduplicated": false,
+    "existingTenantMatchesEvaluated": false
+  },
+  "webVisualDemo": {
+    "url": "http://127.0.0.1:18420",
+    "loopbackOnly": true,
+    "syntheticCsvRows": 600,
+    "created": 600,
+    "tenantADashboardProspects": 600,
+    "tenantBDashboardProspects": 0,
+    "tenantBDashboardCampaigns": 0,
+    "jobs": 0,
+    "generationDisabledMessageVerified": true,
+    "loginTenantSelectionLogoutVerified": true,
+    "independentFromAutomatedFixtureWithManualProspect": true,
+    "credentials": "ephemeral; only in ignored local .tmp/core-stack.json",
+    "keptRunningForPresentationRehearsal": true
+  },
+  "screenshotSha256": {
+    "tenant-a-csv-600.png": "F70B2B7E4FD210308731A40DFDD28A43FEAF969416ED4A660558D7C7A5D69FC7",
+    "tenant-b-isolated.png": "3ADF59B91C8DD194AFBF06BF4E75737190DF419A9BBD2F563745850C35DF0851",
+    "generation-disabled.png": "EDB58721388FDCAA091503253FB07D7D2C2E8B06136D27B30351D64E967304CE"
+  },
+  "hostingReadOnly": {
+    "backendLive": 200,
+    "backendReady": 200,
+    "databaseReported": "up",
+    "backendServedSha": "unverified",
+    "declaredFrontendDomainsHttp": 404,
+    "productionDeploymentMetadata": {
+      "id": 7217774254,
+      "sha": "a85a99678101b3f5562f66d7dd1c1c454b1d20cb",
+      "status": "success",
+      "actualPage": "Vercel login redirect; SPA not validated"
+    },
+    "corsPreflight": "204 without Access-Control-Allow-Origin for checked frontend origins",
+    "providerSecretsAdminAccountMigrationsBackupRestoreCostsLimits": "unverified",
+    "productionStateAt19Hours": "not assumed"
+  },
+  "generationInitialRelease": "PROSPECTOR_ENABLED=false",
+  "productionPending": [
+    "Human PR review and owner authorization",
+    "Effective public frontend origin and HTTPS",
+    "CORS for exact authorized origin",
+    "Actual served SHA and authenticated smoke",
+    "Managed environment, ADMIN and tenants",
+    "Backup, restore drill and rollback compatibility",
+    "Production migration state and authorized rehearsal",
+    "Provider costs, quotas, logs and retention"
+  ],
+  "mainAlreadyIncludesCsvV1": true
+}
