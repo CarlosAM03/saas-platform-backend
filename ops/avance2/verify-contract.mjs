@@ -74,6 +74,8 @@ for (const path of new Set([
 }
 const result = {
   date: new Date().toISOString(),
+  backendSpec,
+  frontendSpec,
   backendVersion: b.info.version,
   frontendVersion: f.info.version,
   operations: ops,
