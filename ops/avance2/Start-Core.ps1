@@ -10,10 +10,25 @@ function Ensure-LocalConfig([string]$File,[switch]$Experimental) {
  if(-not(Test-Path -LiteralPath $File)){
   $dir=Split-Path -Parent $File; New-Item -ItemType Directory -Path $dir -Force | Out-Null
   $evidence=Join-Path $dir 'evidence';New-Item -ItemType Directory -Path $evidence -Force | Out-Null
-  $lines=@('LOCAL_DB_PASSWORD='+(New-LocalSecret),'LOCAL_DEMO_PASSWORD='+(New-LocalSecret),'LOCAL_JWT_SECRET='+(New-LocalSecret)+'a1b2c3d4e5f67890','LOCAL_EVIDENCE_DIR='+($evidence.Replace('\','/')))
-  if($Experimental){$lines+=@('LOCAL_SERVICE_KEY='+(New-LocalSecret),'LOCAL_CALLBACK_KEY='+(New-LocalSecret),'LOCAL_GENERATION=demo-controlled-initial')}
+  $lines=@(
+   ('LOCAL_DB_PASSWORD='+(New-LocalSecret))
+   ('LOCAL_DEMO_PASSWORD='+(New-LocalSecret))
+   ('LOCAL_JWT_SECRET='+(New-LocalSecret)+'a1b2c3d4e5f67890')
+   ('LOCAL_EVIDENCE_DIR='+($evidence.Replace('\','/')))
+  )
+  if($Experimental){$lines+=@(
+   ('LOCAL_SERVICE_KEY='+(New-LocalSecret))
+   ('LOCAL_CALLBACK_KEY='+(New-LocalSecret))
+   'LOCAL_GENERATION=demo-controlled-initial'
+  )}
   [IO.File]::WriteAllLines($File,$lines,[Text.UTF8Encoding]::new($false))
  }
+ $settings=@{}
+ foreach($line in Get-Content -LiteralPath $File){if($line -match '^([A-Z_]+)=(.*)$'){$settings[$Matches[1]]=$Matches[2]}}
+ $required=@('LOCAL_DB_PASSWORD','LOCAL_DEMO_PASSWORD','LOCAL_JWT_SECRET','LOCAL_EVIDENCE_DIR')
+ if($Experimental){$required+=@('LOCAL_SERVICE_KEY','LOCAL_CALLBACK_KEY','LOCAL_GENERATION')}
+ foreach($key in $required){if(-not $settings[$key]){throw ("Missing local configuration key: "+$key)}}
+ if($settings.LOCAL_JWT_SECRET.Length -lt 32 -or $settings.LOCAL_DEMO_PASSWORD.Length -lt 12){throw 'Local credentials do not meet minimum lengths'}
 }
 
 $backend=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
