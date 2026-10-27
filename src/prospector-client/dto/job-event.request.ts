@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayMaxSize,
+  MaxLength,
   IsDefined,
   IsEmail,
   IsIn,
@@ -29,7 +31,13 @@ export class BusinessResult {
   @IsOptional() @IsString() address?: string | null;
   @IsOptional() @IsString() phone?: string | null;
   @IsOptional() @IsEmail() email?: string | null;
-  @IsOptional() @IsUrl({ require_protocol: true }) website?: string | null;
+  @IsOptional()
+  @IsUrl({
+    require_protocol: true,
+    protocols: ['http', 'https'],
+    require_tld: false,
+  })
+  website?: string | null;
   @IsOptional() @IsString() sourceIdentifier?: string | null;
   @IsOptional() @IsString() language?: string | null;
   @IsOptional() @IsObject() metadata?: { [key: string]: JsonValue } | null;
@@ -46,18 +54,18 @@ export class PipelineProgress {
 }
 
 export class JobEventError {
-  @IsString() code!: string;
+  @IsString() @MaxLength(64) @Matches(/^[A-Z0-9_]+$/) code!: string;
   @IsString() message!: string;
 }
 
 export class JobEventRequest {
   @IsUUID() eventId!: string;
   @Matches(/^c[a-z0-9]{20,}$/) jobId!: string;
-  @IsInt() @Min(1) sequence!: number;
+  @IsInt() @Min(1) @Max(2147483647) sequence!: number;
   @IsIn(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'])
   status!: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   @IsISO8601({ strict: true, strictSeparator: true })
-  @Matches(/T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/)
+  @Matches(/T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]00:00)$/)
   timestamp!: string;
 
   // These fields are required but may explicitly be null.
@@ -71,6 +79,7 @@ export class JobEventRequest {
   @ValidateIf((_object, value: unknown) => value !== null)
   @IsDefined()
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => BusinessResult)
   results!: BusinessResult[] | null;

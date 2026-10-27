@@ -35,6 +35,10 @@ export class ProspectingJobsController {
   list(@Query() query: JobListQuery) {
     return this.jobs.findAll(query);
   }
+  @Get('capabilities')
+  capabilities() {
+    return this.jobs.capabilities();
+  }
   @Get(':id')
   detail(@Param('id') id: string) {
     return this.jobs.findOne(id);

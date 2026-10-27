@@ -50,10 +50,16 @@ jobs:
         with:
           node-version: '20'
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install "git+https://github.com/CarlosAM03/prospector-service.git@566bbbe67a59a0fda307ea7d8c5f6bf46fd93aab"
       - run: npm ci
       - run: npm run prisma:generate
       - run: npm run prisma:migrate:deploy
       - run: npm run test:postgres
+        env:
+          PROSPECTOR_TEST_PYTHON: python
 
   docker-build:
     runs-on: ubuntu-latest

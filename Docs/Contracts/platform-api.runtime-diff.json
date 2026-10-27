@@ -1,0 +1,15 @@
+{
+  "runtimeOnly": [
+    "GET /api/v1",
+    "POST /api/v1/internal/prospecting-jobs/{jobId}/events"
+  ],
+  "canonicalOnly": [],
+  "runtimeSchemaCount": 13,
+  "servedSchemaCount": 48,
+  "notes": [
+    "Runtime decorator generation contains default status codes and incomplete validation/property schemas. It cannot prove successful execution.",
+    "The authenticated greeting /api/v1 and internal X-API-Key callback are intentionally outside the Flutter public resource specification.",
+    "Cancel/persist/export default 2xx metadata in runtime generation is superseded by implemented 503 and the served contract; HTTP tests enforce it.",
+    "DTO constraints, error envelopes and conditional creation are established by source and validation/HTTP tests, not inferred from default decorator metadata."
+  ]
+}

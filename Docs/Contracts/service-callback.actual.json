@@ -1,0 +1,253 @@
+{
+  "$defs": {
+    "BusinessResult": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "const": "google_maps",
+          "title": "Source",
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Address"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phone"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "format": "email",
+          "title": "Email"
+        },
+        "website": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "format": "uri",
+          "title": "Website"
+        },
+        "sourceIdentifier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sourceidentifier"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metadata"
+        }
+      },
+      "required": [
+        "name",
+        "source"
+      ],
+      "title": "BusinessResult",
+      "type": "object"
+    },
+    "JobEventError": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "JobEventError",
+      "type": "object"
+    },
+    "JobStatus": {
+      "enum": [
+        "QUEUED",
+        "RUNNING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "title": "JobStatus",
+      "type": "string"
+    },
+    "PipelineProgress": {
+      "properties": {
+        "source": {
+          "const": "google_maps",
+          "title": "Source",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "percentage": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Percentage",
+          "type": "number"
+        }
+      },
+      "required": [
+        "source",
+        "stage",
+        "message",
+        "percentage"
+      ],
+      "title": "PipelineProgress",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "eventId": {
+      "format": "uuid",
+      "title": "Eventid",
+      "type": "string"
+    },
+    "jobId": {
+      "pattern": "^c[a-z0-9]{20,}$",
+      "title": "Jobid",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 1,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/JobStatus"
+    },
+    "progress": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PipelineProgress"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "results": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/BusinessResult"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Results"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/JobEventError"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "eventId",
+    "jobId",
+    "sequence",
+    "status",
+    "progress",
+    "timestamp",
+    "results",
+    "error"
+  ],
+  "title": "JobEvent",
+  "type": "object"
+}
