@@ -12,7 +12,7 @@ Service desde VCS 70f6081 (direct_url.json); Python 3.13.4.
 Backend base origin/dev 967044e2dc7d10ea91d7d78a86e1ea6fe2accd1a,
 main 3a3309398458ab333d7b00f16e9c2df6a09ef734 con árbol idéntico y CSV presente.
 Rama aislada feat/prospector-service-mvp-integration. SHA de implementación:
-consultar el commit que incorpora este reporte y el manifiesto contractual posterior.
+d19b78afef8148a41f69397f6fdbc5ef70c5f912. El manifiesto contractual fija ese SHA y el hash del YAML.
 Flutter autoridad fix/f5-foundation 97645e4a9abcfb52121d74e2b1d6f5a14a73e3ef;
 sin cambios funcionales hasta pasar gate 2.
 Cuatro árboles limpios al iniciar, sin operaciones Git pendientes ni worktrees extra.
@@ -150,7 +150,7 @@ Se probaron aceptación/callbacks COMPLETED/FAILED, vacíos, secuencia/duplicado
 callbacks antes de202, timeout, callback fallido, 401 real/409 real Service, rechazo503
 cliente HTTP, red/redirect, cuotas/concurrencia, aislamiento, rollback, constraints, TTL,
 reinicio Backend, snapshot durable, late terminal y ausencia de claves en logs.
-Lint, formato, build y tsc completo se registran en manifiesto final.
+Lint, formato, build y tsc --noEmit completo PASS.
 Docker daemon no disponible: builds no ejecutados/aprobados. CI conserva jobs independientes;
 PostgreSQL CI instala Service main pin566 y sus dependencias Engine fijadas, sin Google Maps.
 
@@ -177,7 +177,7 @@ PROSPECTOR_TEST_PYTHON selecciona ese intérprete. npm ci; npm run prisma:genera
 npm run prisma:migrate:deploy; npm run test:unit:ci; npm run test:e2e:ci; npm run test:postgres.
 Script test/scripts/mvp-stack.ts levanta sólo loopback y fixtures propietarios. Ejecutar
 con ts-node y la DB de prueba, usar .tmp/mvp-stack.json desde la prueba Flutter real;
-enviar stop por stdin limpia sus fixtures y cierra Nest/FastAPI. No imprimir manifiesto
+enviar stop por stdin o crear el archivo stopFile indicado en el manifiesto limpia sus fixtures y cierra Nest/FastAPI. No imprimir manifiesto
 con credencial temporal de fixture en logs públicos. No es un comando de producción.
 Commits separados de Flutter y sin push. Manifiesto posterior fija SHA exacto del contrato.
 

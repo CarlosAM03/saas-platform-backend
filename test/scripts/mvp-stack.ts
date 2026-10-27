@@ -5,7 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule } from '@nestjs/swagger';
 import { json } from 'express';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { hash } from 'bcrypt';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -80,11 +81,13 @@ async function main() {
     },
   });
   mkdirSync('.tmp', { recursive: true });
+  const stopFile = resolve('.tmp/mvp-stack-' + randomUUID() + '.stop');
   writeFileSync(
     '.tmp/mvp-stack.json',
     JSON.stringify(
       {
-        apiBaseUrl: origin + '/api/v1',
+        apiBaseUrl: origin,
+        stopFile,
         email,
         password,
         tenantId: tenants[0].id,
@@ -100,6 +103,7 @@ async function main() {
   const stop = async () => {
     if (closing) return;
     closing = true;
+    clearInterval(control);
     await service.stop();
     await prisma.prospectingJob.deleteMany({
       where: { tenantId: { in: tenantIds } },
@@ -118,9 +122,13 @@ async function main() {
     await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
     await prisma.user.delete({ where: { id: user.id } });
     await app.close();
+    await prisma.$disconnect();
     process.exitCode = 0;
     process.stdin.pause();
   };
+  const control = setInterval(() => {
+    if (existsSync(stopFile)) void stop();
+  }, 100);
   process.stdin.on('data', (chunk: Buffer) => {
     if (chunk.toString().trim() === 'stop') void stop();
   });
