@@ -24,7 +24,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+        : typeof exception === 'object' &&
+            exception !== null &&
+            'type' in exception &&
+            exception.type === 'entity.too.large'
+          ? HttpStatus.PAYLOAD_TOO_LARGE
+          : HttpStatus.INTERNAL_SERVER_ERROR;
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : undefined;
     const responseBody =
@@ -45,6 +50,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       403: 'FORBIDDEN',
       404: 'NOT_FOUND',
       409: 'CONFLICT',
+      413: 'PAYLOAD_TOO_LARGE',
       429: 'TOO_MANY_REQUESTS',
       500: 'INTERNAL_SERVER_ERROR',
     };
