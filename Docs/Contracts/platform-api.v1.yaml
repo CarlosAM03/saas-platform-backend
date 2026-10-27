@@ -1,12 +1,13 @@
 openapi: 3.0.3
 info:
   title: Platform API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Contrato HTTP V1 entre Flutter y Platform Backend. Los DTOs son independientes
     de Prisma; el tenant se resuelve desde el contexto autenticado.
-    F4 implementa Auth, Users y Health. Tenants, Campaigns, Prospects y
-    Prospecting Jobs conservan su contrato objetivo para fases posteriores.
+    Auth, Users, Health, Tenants, Campaigns, Prospects y CSV están implementados.
+    Jobs ofrece creación condicionada por política/readiness/cuotas y snapshots TTL una hora.
+    Cancelar, persistir y exportar Jobs están deshabilitados.
 servers:
   - url: https://api.example.invalid
     description: Placeholder; el entorno real se configura fuera del contrato.
@@ -572,7 +573,14 @@ paths:
     post:
       tags: [Prospecting Jobs]
       summary: Crea y encola un Job de prospección
-      description: El tenant se obtiene del contexto JWT. La operación es idempotente por Idempotency-Key.
+      description: >-
+        Requiere tenant seleccionado y campaña ACTIVA del tenant; ADMIN/OWNER/MEMBER.
+        Idempotencia PostgreSQL por tenant, usuario y hash de clave (1–200 bytes). Mismo payload
+        devuelve el mismo Job; otro payload devuelve 409. Sin reenvío automático al Service.
+        Deshabilitado por defecto; requiere política completa, presupuesto conservador aprobado,
+        readiness y cupo. Una respuesta incierta devuelve 503 con details.reason=PROSPECTOR_DISPATCH_UNCERTAIN
+        y details.jobId para consultar; conservar la clave y payload. 201 puede contener un estado
+        avanzado por callbacks adelantados; nunca supone que el scraping haya terminado.
       operationId: createProspectingJob
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
@@ -583,7 +591,7 @@ paths:
             schema: { $ref: '#/components/schemas/CreateProspectingJobRequest' }
       responses:
         '201':
-          description: Job creado con estado QUEUED.
+          description: Aceptación confirmada; detalle efectivo del mismo Job, incluso en replay.
           content:
             application/json:
               schema:
@@ -593,6 +601,13 @@ paths:
                     properties: { data: { $ref: '#/components/schemas/ProspectingJobDetail' } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429':
+          description: Cuota de tenant o global agotada; error.details.reason identifica el límite.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '409': { $ref: '#/components/responses/Conflict' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
     get:
@@ -604,16 +619,37 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/JobPage' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/prospecting-jobs/capabilities:
+    get:
+      tags: [Prospecting Jobs]
+      summary: Verifica habilitación actual para el tenant
+      operationId: getProspectingCapabilities
+      security: [{ bearerAuth: [] }]
+      description: Comprobación actual de política, cuota, capacidad y readiness; POST revalida. Fallback seguro si falta la ruta. Nunca contiene claves ni URLs internas.
+      responses:
+        '200':
+          description: Capacidades efectivas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProspectingCapabilities' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /api/v1/prospecting-jobs/{id}:
     get:
       tags: [Prospecting Jobs]
       summary: Obtiene el detalle de un Job
+      description: Snapshot PostgreSQL TTL una hora desde callback final; vencido resultsAvailable=false y results=null. progress=null. retryAllowed acredita liberación de reserva, nunca reintento automático.
       operationId: getProspectingJob
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/EntityId' }]
       responses:
         '200':
-          description: Detalle del Job, incluyendo datos temporales cuando existan.
+          description: Detalle durable; resultsAvailable=true sólo con snapshot COMPLETED vigente (incluye lista vacía).
           content:
             application/json:
               schema:
@@ -626,49 +662,35 @@ paths:
   /api/v1/prospecting-jobs/{id}/cancel:
     post:
       tags: [Prospecting Jobs]
-      summary: Solicita la cancelación de un Job
+      summary: No disponible — cancel
       operationId: cancelProspectingJob
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      description: Operación deshabilitada; no invoca ningún endpoint Service ni modifica prospectos.
       responses:
-        '200':
-          description: Job cancelado o solicitud de cancelación aceptada.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties: { data: { $ref: '#/components/schemas/ProspectingJobDetail' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /api/v1/prospecting-jobs/{id}/persist:
     post:
       tags: [Prospecting Jobs]
-      summary: Persiste los resultados temporales de un Job
-      description: Mapea BusinessResult a Prospect y CampaignProspect aplicando la deduplicación definida por Platform.
+      summary: No disponible — persist
       operationId: persistProspectingJob
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      description: Operación deshabilitada; no invoca ningún endpoint Service ni modifica prospectos.
       responses:
-        '200':
-          description: Resultados persistidos.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
-                  - type: object
-                    properties: { data: { $ref: '#/components/schemas/PersistResultsResult' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /api/v1/prospecting-jobs/{id}/export:
     get:
       tags: [Prospecting Jobs]
-      summary: Exporta resultados en CSV o XLSX
-      description: Respuesta binaria; no utiliza el wrapper JSON estándar. ADR-002 define GET para esta operación.
+      summary: No disponible — export
       operationId: exportProspectingJob
       security: [{ bearerAuth: [] }]
       parameters:
@@ -677,18 +699,13 @@ paths:
           in: query
           required: true
           schema: { $ref: '#/components/schemas/ExportFormat' }
+      description: Operación deshabilitada; no invoca ningún endpoint Service ni modifica prospectos.
       responses:
-        '200':
-          description: Archivo de exportación.
-          content:
-            text/csv:
-              schema: { type: string, format: binary }
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema: { type: string, format: binary }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -917,14 +934,28 @@ components:
         metadata: { type: object, nullable: true, additionalProperties: true }
         createdAt: { $ref: '#/components/schemas/DateTime' }
         updatedAt: { $ref: '#/components/schemas/DateTime' }
+    ProspectingCapabilities:
+      type: object
+      required: [contractVersion, create, cancel, persist, export, reason, source, minLimit, maxLimit, resultsTtlSeconds]
+      properties:
+        contractVersion: { type: string, enum: [prospector-mvp-v1] }
+        create: { type: boolean }
+        cancel: { type: boolean, enum: [false] }
+        persist: { type: boolean, enum: [false] }
+        export: { type: boolean, enum: [false] }
+        reason: { type: string, nullable: true }
+        source: { type: string, enum: [google_maps] }
+        minLimit: { type: integer, enum: [1] }
+        maxLimit: { type: integer, enum: [100] }
+        resultsTtlSeconds: { type: integer, enum: [3600] }
     ProspectingQuery:
       type: object
       required: [keyword, location, source, limit]
       properties:
-        keyword: { type: string }
-        location: { type: string }
+        keyword: { type: string, pattern: '\S' }
+        location: { type: string, pattern: '\S' }
         source: { type: string, enum: [google_maps] }
-        limit: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
     PipelineProgress:
       type: object
       nullable: true
@@ -978,13 +1009,17 @@ components:
             requestedLimit: { type: integer, nullable: true }
             error: { type: string, nullable: true }
             updatedAt: { $ref: '#/components/schemas/DateTime' }
-            resultsAvailable: { type: boolean, description: Computed/cache-only. }
+            resultsAvailable: { type: boolean, description: Snapshot COMPLETED vigente; lista vacía también disponible. }
             results:
               type: array
               nullable: true
               items: { $ref: '#/components/schemas/BusinessResult' }
-              description: Temporal/cache-only; no es una relación Prisma.
-            progress: { $ref: '#/components/schemas/PipelineProgress' }
+              description: Snapshot PostgreSQL acotado, TTL una hora; no son prospectos guardados en campaña.
+            progress: { type: object, nullable: true, enum: [null], description: Service actual no emite porcentaje. }
+            resultsExpiresAt: { type: string, format: date-time, nullable: true }
+            dispatchState: { type: string, nullable: true, enum: [PENDING, ACCEPTED, UNCERTAIN, REJECTED, null] }
+            failureCode: { type: string, nullable: true }
+            retryAllowed: { type: boolean, description: Nueva intención manual sólo tras fallo confirmado o reserva liberada. }
     LoginRequest:
       type: object
       required: [email, password]

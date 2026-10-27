@@ -2,6 +2,7 @@
 // These values belong only to the isolated E2E suite (Prisma is replaced).
 Object.assign(process.env, {
   NODE_ENV: 'test',
+  PROSPECTOR_ENABLED: 'false',
   PORT: '3000',
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   JWT_SECRET: 'test-secret',

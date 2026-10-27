@@ -1,20 +1,28 @@
 import { ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ProspectorPolicy } from './prospector-policy';
 import { ProspectorClientService } from './prospector-client.service';
 
 describe('ProspectorClientService disabled adapter', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('refuses availability before a caller writes jobs', () => {
-    expect(() => new ProspectorClientService().assertAvailable()).toThrow(
-      ServiceUnavailableException,
-    );
+    expect(() =>
+      new ProspectorClientService(
+        new ProspectorPolicy(
+          new ConfigService({ PROSPECTOR_ENABLED: 'false' }),
+        ),
+      ).assertAvailable(),
+    ).toThrow(ServiceUnavailableException);
   });
 
   it('rejects start and cancellation without contacting Python', async () => {
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
       .mockRejectedValue(new Error('Unexpected network call'));
-    const service = new ProspectorClientService();
+    const service = new ProspectorClientService(
+      new ProspectorPolicy(new ConfigService({ PROSPECTOR_ENABLED: 'false' })),
+    );
     await expect(
       service.startJob({
         jobId: 'cm123456789012345678901234',

@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
+import { json } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -12,9 +13,15 @@ import { deploymentDocument } from './common/openapi/deployment-document';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Service bounds result arrays at 1 MiB; allow only a small envelope overhead here.
+  app.use(
+    '/api/v1/internal/prospecting-jobs',
+    json({ limit: 1048576 + 16384 }),
+  );
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
+  app.use(json());
   app.setGlobalPrefix('api/v1');
   app.use(helmet());
   app.enableCors({

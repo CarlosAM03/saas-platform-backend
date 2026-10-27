@@ -55,12 +55,12 @@ enum ProspectingJobStatus {
 // ============================================================
 
 model Tenant {
-  id          String         @id @default(cuid())
-  name        String
-  slug        String         @unique
-  status      TenantStatus   @default(ACTIVO)
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVO)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
 
   // Relations
   userTenants UserTenant[]
@@ -73,48 +73,48 @@ model Tenant {
 }
 
 model User {
-  id          String         @id @default(cuid())
-  name        String
-  email       String         @unique
-  passwordHash String         @map("password_hash")
-  platformRole String?       @map("platform_role")
-  status      UserStatus     @default(ACTIVO)
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  platformRole String?    @map("platform_role")
+  status       UserStatus @default(ACTIVO)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
 
   // Relations
-  userTenants UserTenant[]
-  createdCampaigns Campaign[] @relation("CampaignCreator")
-  requestedJobs ProspectingJob[] @relation("JobRequester")
+  userTenants      UserTenant[]
+  createdCampaigns Campaign[]       @relation("CampaignCreator")
+  requestedJobs    ProspectingJob[] @relation("JobRequester")
 
   @@map("users")
 }
 
 model UserTenant {
-  userId    String   @map("user_id")
-  tenantId  String   @map("tenant_id")
-  roleId    String   @map("role_id")
-  joinedAt  DateTime @default(now()) @map("joined_at")
+  userId   String   @map("user_id")
+  tenantId String   @map("tenant_id")
+  roleId   String   @map("role_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id])
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  role      Role     @relation(fields: [roleId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
 
   @@id([userId, tenantId])
   @@map("user_tenants")
 }
 
 model Role {
-  id          String         @id @default(cuid())
-  tenantId    String         @map("tenant_id")
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
   name        RoleName
   description String?
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
   userTenants UserTenant[]
 
   @@unique([tenantId, name])
@@ -122,46 +122,46 @@ model Role {
 }
 
 model Campaign {
-  id          String          @id @default(cuid())
-  tenantId    String          @map("tenant_id")
-  createdBy   String          @map("created_by")
+  id          String         @id @default(cuid())
+  tenantId    String         @map("tenant_id")
+  createdBy   String         @map("created_by")
   name        String
   description String?
-  status      CampaignStatus  @default(ACTIVA)
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
+  status      CampaignStatus @default(ACTIVA)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  tenant      Tenant          @relation(fields: [tenantId], references: [id])
-  creator     User            @relation("CampaignCreator", fields: [createdBy], references: [id])
-  jobs        ProspectingJob[]
-  prospects   Prospect[]      // 1:N directa (origen)
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  creator           User               @relation("CampaignCreator", fields: [createdBy], references: [id])
+  jobs              ProspectingJob[]
+  prospects         Prospect[] // 1:N directa (origen)
   campaignProspects CampaignProspect[]
 
   @@map("campaigns")
 }
 
 model Prospect {
-  id               String          @id @default(cuid())
-  tenantId         String          @map("tenant_id")
-  campaignId       String          @map("campaign_id")   // campaña de origen
+  id               String         @id @default(cuid())
+  tenantId         String         @map("tenant_id")
+  campaignId       String         @map("campaign_id") // campaña de origen
   name             String
   category         String?
   address          String?
   phone            String?
   email            String?
   website          String?
-  source           String          // ej. "google_maps"
-  sourceIdentifier String?         @map("source_identifier")
+  source           String // ej. "google_maps"
+  sourceIdentifier String?        @map("source_identifier")
   language         String?
-  status           ProspectStatus  @default(ACTIVO)
-  metadata         Json?           // información adicional flexible
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @updatedAt @map("updated_at")
+  status           ProspectStatus @default(ACTIVO)
+  metadata         Json? // información adicional flexible
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  tenant           Tenant          @relation(fields: [tenantId], references: [id])
-  campaign         Campaign        @relation(fields: [campaignId], references: [id])
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  campaign          Campaign           @relation(fields: [campaignId], references: [id])
   campaignProspects CampaignProspect[]
 
   @@unique([tenantId, campaignId, source, sourceIdentifier])
@@ -169,37 +169,84 @@ model Prospect {
 }
 
 model CampaignProspect {
-  campaignId  String   @map("campaign_id")
-  prospectId  String   @map("prospect_id")
-  status      String   @default("ACTIVO") // se puede usar enum más adelante
-  addedAt     DateTime @default(now()) @map("added_at")
+  campaignId String   @map("campaign_id")
+  prospectId String   @map("prospect_id")
+  status     String   @default("ACTIVO") // se puede usar enum más adelante
+  addedAt    DateTime @default(now()) @map("added_at")
 
   // Relations
-  campaign    Campaign @relation(fields: [campaignId], references: [id])
-  prospect    Prospect @relation(fields: [prospectId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  prospect Prospect @relation(fields: [prospectId], references: [id])
 
   @@id([campaignId, prospectId])
   @@map("campaign_prospects")
 }
 
 model ProspectingJob {
-  id            String                @id @default(cuid())
-  tenantId      String                @map("tenant_id")
-  campaignId    String                @map("campaign_id")
-  requestedBy   String                @map("requested_by")
-  status        ProspectingJobStatus  @default(QUEUED)
-  query         Json                  // { keyword, location, source, limit }
+  id             String               @id @default(cuid())
+  tenantId       String               @map("tenant_id")
+  campaignId     String               @map("campaign_id")
+  requestedBy    String               @map("requested_by")
+  status         ProspectingJobStatus @default(QUEUED)
+  query          Json // { keyword, location, source, limit }
   requestedLimit Int?                 @map("requested_limit")
-  startedAt     DateTime?             @map("started_at")
-  completedAt   DateTime?             @map("completed_at")
-  error         String?
-  createdAt     DateTime              @default(now()) @map("created_at")
-  updatedAt     DateTime              @updatedAt @map("updated_at")
+  startedAt      DateTime?            @map("started_at")
+  completedAt    DateTime?            @map("completed_at")
+  error          String?
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
 
   // Relations
-  tenant        Tenant                @relation(fields: [tenantId], references: [id])
-  campaign      Campaign              @relation(fields: [campaignId], references: [id])
-  requester     User                  @relation("JobRequester", fields: [requestedBy], references: [id])
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  campaign  Campaign @relation(fields: [campaignId], references: [id])
+  requester User     @relation("JobRequester", fields: [requestedBy], references: [id])
 
+  idempotencyKeyHash String?                   @map("idempotency_key_hash")
+  payloadHash        String?                   @map("payload_hash")
+  dispatchState      ProspectingDispatchState? @map("dispatch_state")
+  serviceGeneration  String?                   @map("service_generation")
+  lastSequence       Int                       @default(0) @map("last_sequence")
+  deadlineAt         DateTime?                 @map("deadline_at")
+  capacityReleasedAt DateTime?                 @map("capacity_released_at")
+  failureCode        String?                   @map("failure_code")
+  resultsExpiresAt   DateTime?                 @map("results_expires_at")
+  events             ProspectingJobEvent[]
+  snapshot           ProspectingJobSnapshot?
+
+  @@unique([tenantId, requestedBy, idempotencyKeyHash], map: "prospecting_jobs_intention_key")
+  @@index([createdAt])
+  @@index([deadlineAt])
   @@map("prospecting_jobs")
+}
+
+enum ProspectingDispatchState {
+  PENDING
+  ACCEPTED
+  UNCERTAIN
+  REJECTED
+}
+
+model ProspectingJobEvent {
+  jobId       String         @map("job_id")
+  eventId     String         @map("event_id") @db.Uuid
+  sequence    Int
+  payloadHash String         @map("payload_hash")
+  disposition String
+  receivedAt  DateTime       @default(now()) @map("received_at")
+  job         ProspectingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, eventId])
+  @@unique([jobId, sequence])
+  @@map("prospecting_job_events")
+}
+
+model ProspectingJobSnapshot {
+  jobId     String         @id @map("job_id")
+  results   Json
+  bytes     Int
+  expiresAt DateTime       @map("expires_at")
+  job       ProspectingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("prospecting_job_snapshots")
 }

@@ -7,6 +7,7 @@ if (!databaseUrl) {
 
 Object.assign(process.env, {
   NODE_ENV: 'test',
+  PROSPECTOR_ENABLED: 'false',
   PORT: '3000',
   DATABASE_URL: databaseUrl,
   JWT_SECRET: 'integration-test-secret',

@@ -140,13 +140,18 @@ describe('Platform without Prospector configuration or network', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('publishes Swagger with unavailable integration operations and real read routes', async () => {
+  it('publishes conditional creation, unavailable future operations and real read routes', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/docs-json')
       .expect(200);
     const document = response.body as OpenAPIObject;
+    expect(
+      document.paths['/api/v1/prospecting-jobs'].post!.responses['201'],
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/prospecting-jobs/capabilities'].get,
+    ).toBeDefined();
     for (const [path, method] of [
-      ['/api/v1/prospecting-jobs', 'post'],
       ['/api/v1/prospecting-jobs/{id}/cancel', 'post'],
       ['/api/v1/prospecting-jobs/{id}/persist', 'post'],
       ['/api/v1/prospecting-jobs/{id}/export', 'get'],

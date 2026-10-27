@@ -15,7 +15,9 @@ export class InternalApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     const supplied = request.headers['x-api-key'];
-    const expected = this.config.get<string>('PROSPECTOR_API_KEY');
+    const expected =
+      this.config.get<string>('PROSPECTOR_CALLBACK_API_KEY') ??
+      this.config.get<string>('PROSPECTOR_API_KEY');
     if (
       typeof supplied !== 'string' ||
       !supplied ||

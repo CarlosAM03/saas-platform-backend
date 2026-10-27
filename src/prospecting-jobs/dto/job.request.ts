@@ -7,16 +7,17 @@ import {
   IsString,
   Matches,
   Min,
+  Max,
   ValidateNested,
 } from 'class-validator';
 import { PickType } from '@nestjs/swagger';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class ProspectingQueryRequest {
-  @IsString() keyword!: string;
-  @IsString() location!: string;
+  @IsString() @Matches(/\S/) keyword!: string;
+  @IsString() @Matches(/\S/) location!: string;
   @IsIn(['google_maps']) source!: 'google_maps';
-  @IsInt() @Min(1) limit!: number;
+  @IsInt() @Min(1) @Max(100) limit!: number;
 }
 
 export class CreateJobRequest {
