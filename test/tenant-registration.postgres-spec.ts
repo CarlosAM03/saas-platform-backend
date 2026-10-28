@@ -10,6 +10,7 @@ import { DeliveryService } from '../src/tenant-registration/delivery.service';
 import { TenantRegistrationService } from '../src/tenant-registration/tenant-registration.service';
 import { ActivationService } from '../src/tenant-registration/activation.service';
 import { ActivationRateLimitService } from '../src/tenant-registration/activation-rate-limit.service';
+import { createHash } from 'node:crypto';
 
 describe('ADR006 real PostgreSQL (disposable database only)', () => {
   let prisma: PrismaService,
@@ -363,7 +364,6 @@ describe('ADR006 real PostgreSQL (disposable database only)', () => {
       ).consume('redeem', id, id),
     ).rejects.toMatchObject({ status: 429 });
     // Only this test's hashed keys, not a global limiter reset.
-    const { createHash } = await import('node:crypto');
     await prisma.activationRateLimit.deleteMany({
       where: {
         key: { endsWith: createHash('sha256').update(id).digest('hex') },
