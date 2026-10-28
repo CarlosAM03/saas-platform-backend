@@ -80,6 +80,8 @@ Confirmar host/base/rol segregado, versión PostgreSQL, sesiones/locks, migracio
 
 Sin cuentas pendientes: mantener esquema expandido y flag OFF; el Core anterior puede funcionar sobre él según el ensayo sintético. Revalidar con copia real en G2 antes de reutilizar esa conclusión en producción. No revertir SQL ni normalización de email a ciegas.
 
+El ensayo check-legacy-login.cjs demuestra un límite adicional: el Core original busca emails literalmente. Un correo histórico válido en mayúsculas inicia sesión antes de migrar; después solo funciona su entrada canónica minúscula en ese código antiguo. La versión candidata sí normaliza. Revisar formas de entrada/consumidor en G2; si no se garantiza compatibilidad, mantener una revisión compatible y usar forward-fix incluso sin cuentas pendientes. Invoke-G1.ps1 incluye esta prueba diagnóstica en una tercera base separada g1_case; PASS del ensayo no significa que la grafía histórica funcione tras volver al código viejo.
+
 Con cualquier cuenta pendiente: prohibido volver a un Backend que ignore mustChangePassword. Apagar nuevas altas/reenvíos, mantener canje/completado, investigar entrega y aplicar forward-fix compatible. No borrar tenants, credenciales ni historial. Un fallo de Brevo no deshace la transacción; consultar onboarding y recuperar mediante reenvío manual tras lease/límites. No automatizar recuperación ni contratar fallback.
 
 G4 comprobará la IP efectiva de Render. G6 comprobará cuenta/remitente/dominio/cuota gratuitos y recepción. G3–G6 = NOT RUN aquí.

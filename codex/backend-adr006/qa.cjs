@@ -19,6 +19,11 @@ const steps = process.argv.includes('--postgres-only')
         process.execPath,
         ['codex/backend-adr006/verify-contract.cjs'],
       ],
+      [
+        'target-guards',
+        process.execPath,
+        ['codex/backend-adr006/verify-target-guards.cjs'],
+      ],
     ];
 for (const [name, cmd, args] of steps) {
   const started = Date.now();

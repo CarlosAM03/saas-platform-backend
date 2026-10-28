@@ -62,6 +62,13 @@ foreach($iteration in 1,2){
   D exec $tools node codex/backend-adr006/lab/rehearsal.cjs candidate $database "http://${new}:3000"
   D stop $new
 }
+D exec $tools node codex/backend-adr006/lab/check-legacy-login.cjs prepare
+$caseApi="$prefix-old-case"
+Start-Api $caseApi $core g1_case
+D exec $tools node codex/backend-adr006/lab/check-legacy-login.cjs before "http://${caseApi}:3000"
+D exec -e DATABASE_URL=postgresql://g1_lab:synthetic-g1-only@prospector-g1-pg:5432/g1_case $tools node codex/backend-adr006/preflight.cjs --expected-host prospector-g1-pg --expected-db g1_case --apply
+D exec $tools node codex/backend-adr006/lab/check-legacy-login.cjs after "http://${caseApi}:3000"
+D stop $caseApi
 D exec $tools node codex/backend-adr006/lab/rehearsal.cjs save g1_history_2
 D exec -e DATABASE_URL=postgresql://g1_lab:synthetic-g1-only@prospector-g1-pg:5432/g1_history_2 -e INTEGRATION_TEST_DATABASE_URL=postgresql://g1_lab:synthetic-g1-only@prospector-g1-pg:5432/g1_history_2 $tools node codex/backend-adr006/qa.cjs --postgres-only
 D exec $tools node codex/backend-adr006/lab/rehearsal.cjs check g1_history_2
