@@ -1,5 +1,7 @@
 # ADR-006 — Evidencia local y gates
 
+> Registro histórico de Ángel (27–28/10). El texto siguiente se conserva: no acredita las ejecuciones posteriores de Codex. CI en ca1e7c9 sí ejecutó PostgreSQL16: [run 40711778812](https://github.com/CarlosAM03/saas-platform-backend/actions/runs/40711778812), jobs quality/postgres-integration/docker-build SUCCESS, verificados nuevamente el 28/10/2026. El nuevo hardening G1 se documenta por SHA y entorno en [evidencias](../../codex/backend-adr006/evidencias/10_HANDOFF_GATE1.md). El transporte vigente es Brevo HTTPS; los resultados SMTP de abajo corresponden a la implementación anterior.
+
 Validación: 27–28/10/2026. Rama `feat/tenant-register`, HEAD inicial/final de referencia
 `b51b265f1a545fa915f1dd1c57ef2f5858ec6492`. No commits/push/merge/despliegues.
 Implementación: [README local](../../src/tenant-registration/README.md).

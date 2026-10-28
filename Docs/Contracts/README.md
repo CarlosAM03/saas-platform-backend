@@ -2,6 +2,10 @@
 
 ## Registro de tenants (ADR-006)
 
+La ubicación canónica consumida por la aplicación es Docs/Contracts/platform-api.tenant-registration.approved.yaml. La copia bajo Docs/ADRs permanece intacta como evidencia histórica; no se usa para componer Swagger. La propuesta *.proposed.yaml y ADR-006-TenantRegistration.md describen diseños sustituidos y no autorizan contraseñas temporales ni oneOf en login. Se preserva el CSV previo de Ángel: no forma parte de las correcciones G1 y no se elimina trabajo ajeno.
+
+Los resultados G1 posteriores se encuentran en [handoff Backend](../../codex/backend-adr006/evidencias/10_HANDOFF_GATE1.md). Las instrucciones operativas vigentes usan Brevo HTTPS y [preflight manual](../../codex/backend-adr006/RUNBOOK.md), sin migraciones en el arranque runtime.
+
 Autoridad: [ADR-006 aprobado](../ADRs/ADR-006-TenantRegistration-APROBADO.md) y
 [contrato aprobado](platform-api.tenant-registration.approved.yaml), preservados
 sin cambios como evidencia. La propuesta anterior queda sustituida: no usar
