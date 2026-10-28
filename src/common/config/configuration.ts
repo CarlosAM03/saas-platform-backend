@@ -29,5 +29,36 @@ export function validateEnvironment(environment: Record<string, unknown>) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be a valid TCP port');
   }
+  if (environment.NODE_ENV === 'production') {
+    const secret = environment.JWT_SECRET;
+    if (
+      typeof secret !== 'string' ||
+      secret.length < 32 ||
+      secret !== secret.trim() ||
+      /^(replace|change.?me|test|integration)/i.test(secret)
+    )
+      throw new Error(
+        'Production JWT_SECRET must be a strong externally managed secret of at least 32 characters',
+      );
+    const origins = String(environment.CORS_ORIGINS).split(',');
+    if (
+      origins.some((value) => {
+        try {
+          const u = new URL(value.trim());
+          return (
+            u.protocol !== 'https:' ||
+            u.origin !== value.trim() ||
+            !!u.username ||
+            !!u.password
+          );
+        } catch {
+          return true;
+        }
+      })
+    )
+      throw new Error(
+        'Production CORS_ORIGINS must contain explicit HTTPS origins',
+      );
+  }
   return { ...environment, PORT: port };
 }

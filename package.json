@@ -88,7 +88,11 @@
   },
   "overrides": {
     "lodash": "4.18.1",
-    "tar": "7.5.22"
+    "tar": "7.5.22",
+    "body-parser": "2.4.0",
+    "multer": "2.5.0",
+    "fast-uri": "3.1.9",
+    "js-yaml": "$js-yaml"
   },
   "jest": {
     "moduleFileExtensions": [

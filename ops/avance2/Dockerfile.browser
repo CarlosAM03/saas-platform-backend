@@ -1,0 +1,6 @@
+FROM python:3.11.14-slim-bookworm@sha256:65a93d69fa75478d554f4ad27c85c1e69fa184956261b4301ebaf6dbb0a3543d
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright PYTHONDONTWRITEBYTECODE=1
+RUN pip install --no-cache-dir playwright==1.61.0 && python -m playwright install --with-deps chromium
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb x11vnc novnc websockify libnss3-tools util-linux && rm -rf /var/lib/apt/lists/* && useradd --create-home --uid 10001 service
+COPY browser_agent.py start-browser.sh /opt/
+CMD ["sh", "/opt/start-browser.sh"]
