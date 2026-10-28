@@ -15,6 +15,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run prisma:generate
+      - run: node codex/backend-adr006/verify-target-guards.cjs
+      - run: node codex/backend-adr006/verify-contract.cjs
       - run: npm run lint:check
       - run: npm run format:check
       - run: npm run build

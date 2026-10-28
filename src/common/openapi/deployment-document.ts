@@ -1,6 +1,7 @@
 import type { OpenAPIObject, ResponseObject } from '@nestjs/swagger';
 import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
+import { addTenantRegistration } from './tenant-registration-document';
 
 /** Deployment documentation only; does not modify the approved target contract. */
 export function deploymentDocument(): OpenAPIObject {
@@ -98,5 +99,9 @@ export function deploymentDocument(): OpenAPIObject {
   if (success && !('$ref' in success))
     success.description =
       'Registro persistido, sin resultados ni progreso temporal.';
+  addTenantRegistration(
+    document,
+    process.env.TENANT_REGISTRATION_ENABLED === 'true',
+  );
   return document;
 }

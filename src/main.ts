@@ -9,11 +9,14 @@ import { RequestIdInterceptor } from './common/interceptors/request-id.intercept
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { SwaggerModule } from '@nestjs/swagger';
 import { deploymentDocument } from './common/openapi/deployment-document';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { configureTrustedProxy } from './common/config/trusted-proxy';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
+  configureTrustedProxy(app, configService.get('TRUSTED_PROXY_CIDRS'));
 
   app.setGlobalPrefix('api/v1');
   app.use(helmet());

@@ -12,7 +12,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import { CreateUserRequest } from './dto/create-user.request';
 import { UpdateUserRequest } from './dto/update-user.request';
 import { UserResponse } from './dto/user.response';
-import { RoleService } from './services/role.service';
+import { normalizeEmail } from '../common/validation/normalize-email';
 
 const userInclude = {
   userTenants: {
@@ -34,24 +34,32 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly passwordService: PasswordService,
-    private readonly roleService: RoleService,
   ) {}
 
   async create(createUserDto: CreateUserRequest): Promise<UserResponse> {
     const tenantId = this.tenantContext.requireTenantId();
-    const role = createUserDto.roleId
-      ? await this.roleService.getRoleById(tenantId, createUserDto.roleId)
-      : await this.roleService.getRoleByName(tenantId, RoleName.MEMBER);
     const passwordHash = await this.passwordService.hash(
       createUserDto.password,
     );
 
     try {
-      const user = await this.prisma.$transaction(async (transaction) => {
+      const user = await this.write(async (transaction) => {
+        const actor = await this.requireAdministrator(transaction, tenantId);
+        const role = await this.resolveRole(
+          transaction,
+          tenantId,
+          createUserDto.roleId,
+        );
+        await this.authorizeRole(
+          transaction,
+          tenantId,
+          role,
+          actor.platformRole === 'ADMIN',
+        );
         const createdUser = await transaction.user.create({
           data: {
             name: createUserDto.name,
-            email: createUserDto.email,
+            email: normalizeEmail(createUserDto.email),
             passwordHash,
           },
         });
@@ -78,6 +86,7 @@ export class UsersService {
         name: true,
         email: true,
         status: true,
+        mustChangePassword: true,
       },
     });
   }
@@ -142,64 +151,87 @@ export class UsersService {
     updateUserDto: UpdateUserRequest,
   ): Promise<UserResponse> {
     const tenantId = this.tenantContext.requireTenantId();
-    await this.findUserInTenant(id, tenantId);
     const passwordHash = updateUserDto.password
       ? await this.passwordService.hash(updateUserDto.password)
       : undefined;
 
-    if (updateUserDto.roleId) {
-      await this.roleService.getRoleById(tenantId, updateUserDto.roleId);
-    }
-
     try {
-      const user = await this.prisma.$transaction(
-        async (transaction) => {
-          const existing = await this.findUserInTenant(
-            id,
-            tenantId,
+      const user = await this.write(async (transaction) => {
+        const actor = await this.requireAdministrator(transaction, tenantId);
+        const existing = await this.findUserInTenant(id, tenantId, transaction);
+        if (
+          existing.mustChangePassword &&
+          (updateUserDto.password !== undefined ||
+            updateUserDto.email !== undefined)
+        ) {
+          throw new ForbiddenException(
+            'Pending accounts must complete activation; credentials cannot be edited',
+          );
+        }
+        const membership = existing.userTenants.find(
+          (m) => m.tenantId === tenantId,
+        )!;
+        // D3: shared identities (including self) and privileged targets are protected.
+        if (
+          actor.platformRole !== 'ADMIN' &&
+          (existing.platformRole === 'ADMIN' ||
+            existing.userTenants.some(
+              (m) =>
+                m.tenantId !== tenantId ||
+                (m.role.name === RoleName.OWNER && existing.id !== actor.id),
+            ))
+        ) {
+          throw new ForbiddenException({
+            message: 'Global identity changes require platform administration',
+            details: { reason: 'GLOBAL_IDENTITY_PROTECTED' },
+          });
+        }
+        if (updateUserDto.roleId) {
+          const role = await this.resolveRole(
             transaction,
+            tenantId,
+            updateUserDto.roleId,
           );
-          const actor = this.tenantContext.getRequiredContext();
-          const identityUpdate = ['name', 'email', 'password', 'status'].some(
-            (key) => updateUserDto[key] !== undefined,
+          await this.authorizeRole(
+            transaction,
+            tenantId,
+            role,
+            actor.platformRole === 'ADMIN',
+            existing.id,
           );
-          // User is a global identity. Tenant OWNER authority may only manage a local identity;
-          // membership role changes remain scoped to this tenant. Do not leak other memberships.
           if (
-            actor.platformRole !== 'ADMIN' &&
-            actor.userId !== id &&
-            (existing.platformRole === 'ADMIN' ||
-              (identityUpdate &&
-                existing.userTenants.some((m) => m.tenantId !== tenantId)))
+            membership.role.name === RoleName.OWNER &&
+            role.name !== RoleName.OWNER
           ) {
-            throw new ForbiddenException({
-              message:
-                'Global identity changes require platform administration',
-              details: { reason: 'GLOBAL_IDENTITY_PROTECTED' },
-            });
+            await this.protectOperationalOwner(transaction, existing, tenantId);
           }
-          await transaction.user.update({
-            where: { id: existing.id },
-            data: {
-              name: updateUserDto.name,
-              email: updateUserDto.email,
-              passwordHash,
-              status: updateUserDto.status,
-            },
+        }
+        if (updateUserDto.status === UserStatus.INACTIVO) {
+          await this.protectOperationalOwner(transaction, existing);
+        }
+        await transaction.user.update({
+          where: { id: existing.id },
+          data: {
+            name: updateUserDto.name,
+            email:
+              updateUserDto.email === undefined
+                ? undefined
+                : normalizeEmail(updateUserDto.email),
+            passwordHash,
+            status: updateUserDto.status,
+          },
+        });
+        if (updateUserDto.roleId) {
+          await transaction.userTenant.update({
+            where: { userId_tenantId: { userId: id, tenantId } },
+            data: { roleId: updateUserDto.roleId },
           });
-          if (updateUserDto.roleId) {
-            await transaction.userTenant.update({
-              where: { userId_tenantId: { userId: id, tenantId } },
-              data: { roleId: updateUserDto.roleId },
-            });
-          }
-          return transaction.user.findUniqueOrThrow({
-            where: { id },
-            include: userInclude,
-          });
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
+        }
+        return transaction.user.findUniqueOrThrow({
+          where: { id },
+          include: userInclude,
+        });
+      });
 
       return this.toResponse(user, tenantId);
     } catch (error) {
@@ -209,11 +241,130 @@ export class UsersService {
 
   async remove(id: string): Promise<void> {
     const tenantId = this.tenantContext.requireTenantId();
-    await this.findUserInTenant(id, tenantId);
-    await this.prisma.user.update({
-      where: { id },
-      data: { status: UserStatus.INACTIVO },
+    await this.write(async (transaction) => {
+      const actor = await this.requireAdministrator(transaction, tenantId);
+      if (actor.platformRole !== 'ADMIN')
+        throw new ForbiddenException('Platform administration required');
+      const existing = await this.findUserInTenant(id, tenantId, transaction);
+      await this.protectOperationalOwner(transaction, existing);
+      await transaction.user.update({
+        where: { id },
+        data: { status: UserStatus.INACTIVO },
+      });
     });
+  }
+
+  private async requireAdministrator(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+  ) {
+    const context = this.tenantContext.getRequiredContext();
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${context.userId} FOR SHARE`;
+    await tx.$queryRaw`SELECT user_id FROM user_tenants WHERE user_id = ${context.userId} AND tenant_id = ${tenantId} FOR SHARE`;
+    const actor = await tx.user.findUnique({
+      where: { id: context.userId },
+      include: userInclude,
+    });
+    if (
+      !actor ||
+      actor.status !== UserStatus.ACTIVO ||
+      actor.mustChangePassword
+    )
+      throw new ForbiddenException('Current administration authority required');
+    if (actor.platformRole === 'ADMIN') return actor;
+    const membership = actor.userTenants.find((m) => m.tenantId === tenantId);
+    if (
+      !membership ||
+      membership.tenant.status !== 'ACTIVO' ||
+      membership.role.tenantId !== tenantId ||
+      membership.role.name !== RoleName.OWNER
+    )
+      throw new ForbiddenException('Current administration authority required');
+    return actor;
+  }
+
+  private async resolveRole(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    roleId?: string,
+  ) {
+    const role = await tx.role.findFirst({
+      where: {
+        tenantId,
+        ...(roleId ? { id: roleId } : { name: RoleName.MEMBER }),
+      },
+    });
+    if (!role) throw new NotFoundException('Role not found in this tenant');
+    return role;
+  }
+
+  private async authorizeRole(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    role: { id: string; name: RoleName },
+    admin: boolean,
+    userId?: string,
+  ) {
+    if (role.name !== RoleName.OWNER) return;
+    if (!admin)
+      throw new ForbiddenException(
+        'Only platform administration can assign OWNER',
+      );
+    const owners = await tx.userTenant.findMany({
+      where: { tenantId, roleId: role.id },
+    });
+    if (owners.some((m) => m.userId !== userId))
+      throw new ConflictException('Tenant already has an OWNER');
+  }
+
+  private async protectOperationalOwner(
+    tx: Prisma.TransactionClient,
+    user: UserWithTenants,
+    onlyTenantId?: string,
+  ) {
+    for (const m of user.userTenants) {
+      if (
+        m.role.name !== RoleName.OWNER ||
+        m.tenant.status !== 'ACTIVO' ||
+        (onlyTenantId && m.tenantId !== onlyTenantId)
+      )
+        continue;
+      const activeOwners = await tx.userTenant.findMany({
+        where: {
+          tenantId: m.tenantId,
+          roleId: m.roleId,
+          user: { status: UserStatus.ACTIVO },
+        },
+      });
+      if (!activeOwners.some((owner) => owner.userId !== user.id))
+        throw new ConflictException('Cannot remove the last operational OWNER');
+    }
+  }
+
+  // PostgreSQL SSI protects the owner predicate and authority reads together with
+  // all identity/membership writes. A concurrent role change retries from fresh DB state.
+  private async write<T>(
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.prisma.$transaction(work, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          (error.code === 'P2034' ||
+            (error.code === 'P2010' &&
+              ['40001', '40P01'].includes(String(error.meta?.code))))
+        ) {
+          if (attempt < 2) continue;
+          throw new ConflictException('Concurrent user administration; retry');
+        }
+        throw error;
+      }
+    }
+    throw new ConflictException('Concurrent user administration; retry');
   }
 
   private async findUserInTenant(

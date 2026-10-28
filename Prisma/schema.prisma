@@ -62,6 +62,8 @@ model Tenant {
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
+  onboarding TenantOnboarding?
+
   // Relations
   userTenants UserTenant[]
   roles       Role[]
@@ -77,6 +79,9 @@ model User {
   name        String
   email       String         @unique
   passwordHash String         @map("password_hash")
+  mustChangePassword Boolean @default(false) @map("must_change_password")
+  ownedOnboardings TenantOnboarding[] @relation("OnboardingOwner")
+  createdOnboardings TenantOnboarding[] @relation("OnboardingCreator")
   platformRole String?       @map("platform_role")
   status      UserStatus     @default(ACTIVO)
   createdAt   DateTime       @default(now()) @map("created_at")
@@ -202,4 +207,86 @@ model ProspectingJob {
   requester     User                  @relation("JobRequester", fields: [requestedBy], references: [id])
 
   @@map("prospecting_jobs")
+}
+
+
+enum OnboardingStatus {
+  PENDING_FIRST_ACCESS
+  COMPLETED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENDING
+  ACCEPTED
+  FAILED
+  UNKNOWN
+}
+
+model TenantOnboarding {
+  id String @id @default(cuid())
+  tenantId String @unique @map("tenant_id")
+  ownerUserId String @unique @map("owner_user_id")
+  createdBy String @map("created_by")
+  generation Int @default(1)
+  activationStatus OnboardingStatus @default(PENDING_FIRST_ACCESS) @map("activation_status")
+  deliveryStatus DeliveryStatus @default(PENDING) @map("delivery_status")
+  createdAt DateTime @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  owner User @relation("OnboardingOwner", fields: [ownerUserId], references: [id])
+  creator User @relation("OnboardingCreator", fields: [createdBy], references: [id])
+  links ActivationLink[]
+  challenges FirstAccessChallenge[]
+  attempts DeliveryAttempt[]
+  @@map("tenant_onboardings")
+}
+
+model ActivationLink {
+  id String @id @default(cuid())
+  tokenHash String @unique @map("token_hash")
+  onboardingId String @map("onboarding_id")
+  generation Int
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  onboarding TenantOnboarding @relation(fields: [onboardingId], references: [id])
+  @@unique([onboardingId, generation])
+  @@map("activation_links")
+}
+
+model FirstAccessChallenge {
+  id String @id @default(cuid())
+  tokenHash String @unique @map("token_hash")
+  onboardingId String @map("onboarding_id")
+  generation Int
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  onboarding TenantOnboarding @relation(fields: [onboardingId], references: [id])
+  @@unique([onboardingId, generation])
+  @@map("first_access_challenges")
+}
+
+model DeliveryAttempt {
+  id String @id @default(cuid())
+  onboardingId String @map("onboarding_id")
+  generation Int
+  createdAt DateTime @default(now()) @map("created_at")
+  leaseExpiresAt DateTime @map("lease_expires_at")
+  status DeliveryStatus @default(SENDING)
+  providerAcceptedAt DateTime? @map("provider_accepted_at")
+  onboarding TenantOnboarding @relation(fields: [onboardingId], references: [id])
+  @@index([onboardingId, createdAt])
+  @@unique([onboardingId, generation])
+  @@index([createdAt])
+  @@map("delivery_attempts")
+}
+
+model ActivationRateLimit {
+  key String @id
+  count Int
+  expiresAt DateTime @map("expires_at")
+  @@index([expiresAt])
+  @@map("activation_rate_limits")
 }

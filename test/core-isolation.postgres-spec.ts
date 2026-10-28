@@ -167,8 +167,8 @@ describe('Core identity protection with the baseline PostgreSQL schema', () => {
     ).toBe('Global edit');
   });
 
-  it('changes only the local membership for a shared user', async () => {
-    await patch(sharedId, { roleId: ownerRole }).expect(200);
+  it('D2 denies OWNER promotion of a shared user', async () => {
+    await patch(sharedId, { roleId: ownerRole }).expect(403);
     expect(
       (
         await db.userTenant.findUniqueOrThrow({
@@ -198,14 +198,14 @@ describe('Core identity protection with the baseline PostgreSQL schema', () => {
     await patch(external.id, { name: 'Forbidden' }).expect(404);
   });
 
-  it('keeps the approved JWT snapshot and rejects inactive identities', async () => {
+  it('D4 revalidates sensitive writes and rejects inactive identities', async () => {
     await db.userTenant.update({
       where: { userId_tenantId: { userId: ownerId, tenantId: a } },
       data: { roleId: memberRole },
     });
     try {
-      // Deliberate residual policy: prior OWNER JWT stays authorized until expiry/new token.
-      await patch(localId, { name: 'Snapshot authorized edit' }).expect(200);
+      // D4 supersedes the historical snapshot policy for sensitive administration.
+      await patch(localId, { name: 'Snapshot forbidden edit' }).expect(403);
       await db.user.update({
         where: { id: ownerId },
         data: { status: 'INACTIVO' },

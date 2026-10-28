@@ -3,7 +3,7 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "setupFiles": ["<rootDir>/setup-postgres-env.ts"],
-  "testRegex": "(jobs|prospect-imports|core-isolation)\\.postgres-spec\\.ts$",
+  "testRegex": "(jobs|prospect-imports|core-isolation|tenant-registration|tenant-registration-migration|users-authorization|proxy-rate-limit|onboarding-http)\\.postgres-spec\\.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },

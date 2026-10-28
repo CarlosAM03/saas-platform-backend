@@ -1,3 +1,5 @@
+import { Transform } from 'class-transformer';
+import { transformEmail } from '../../common/validation/normalize-email';
 import {
   IsEmail,
   ValidateIf,
@@ -13,6 +15,7 @@ export class CreateUserRequest {
   @MinLength(1)
   name!: string;
 
+  @Transform(transformEmail)
   @IsEmail()
   email!: string;
 

@@ -1,5 +1,9 @@
 # Tenants Module
 
+Registro asistido ADR-006 en módulo independiente:
+[Tenant Registration](../tenant-registration/README.md). Está desactivado por defecto;
+POST /tenants conserva su comportamiento anterior sin OWNER/correo implícitos.
+
 ## Proposito
 
 Gestionar organizaciones tenant y su ciclo de vida. El tenant es el limite de aislamiento logico del backend.

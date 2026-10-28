@@ -286,7 +286,7 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
     });
   });
 
-  it('mantiene el snapshot del rol hasta emitir un nuevo JWT', async () => {
+  it('D4 revalidates Users authority with a prior JWT', async () => {
     const token = (await login('owner@example.com')).body.data.accessToken;
     fake._state.userTenants.find((m) => m.userId === 'user-owner')!.roleId =
       'role-a-member';
@@ -298,7 +298,7 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
         email: 'snapshot@example.com',
         password: 'Test-password-123!',
       });
-    expect(oldContext.status).toBe(201);
+    expect(oldContext.status).toBe(403);
     const renewed = (await login('owner@example.com')).body.data.accessToken;
     expect(
       (
@@ -561,7 +561,7 @@ describe('Platform authentication and tenant isolation (e2e)', () => {
       .patch('/api/v1/users/user-multi')
       .set('Authorization', 'Bearer ' + token)
       .send({ roleId: 'role-a-owner' });
-    expect(changed.status).toBe(200);
+    expect(changed.status).toBe(403);
     expect(
       fake._state.userTenants.find(
         (m) => m.userId === 'user-multi' && m.tenantId === 'tenant-b',
