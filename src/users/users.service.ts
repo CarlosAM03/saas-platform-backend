@@ -13,6 +13,7 @@ import { CreateUserRequest } from './dto/create-user.request';
 import { UpdateUserRequest } from './dto/update-user.request';
 import { UserResponse } from './dto/user.response';
 import { RoleService } from './services/role.service';
+import { normalizeEmail } from '../common/validation/normalize-email';
 
 const userInclude = {
   userTenants: {
@@ -51,7 +52,7 @@ export class UsersService {
         const createdUser = await transaction.user.create({
           data: {
             name: createUserDto.name,
-            email: createUserDto.email,
+            email: normalizeEmail(createUserDto.email),
             passwordHash,
           },
         });
@@ -78,6 +79,7 @@ export class UsersService {
         name: true,
         email: true,
         status: true,
+        mustChangePassword: true,
       },
     });
   }
@@ -159,6 +161,15 @@ export class UsersService {
             tenantId,
             transaction,
           );
+          if (
+            existing.mustChangePassword &&
+            (updateUserDto.password !== undefined ||
+              updateUserDto.email !== undefined)
+          ) {
+            throw new ForbiddenException(
+              'Pending accounts must complete activation; credentials cannot be edited',
+            );
+          }
           const actor = this.tenantContext.getRequiredContext();
           const identityUpdate = ['name', 'email', 'password', 'status'].some(
             (key) => updateUserDto[key] !== undefined,
@@ -182,7 +193,10 @@ export class UsersService {
             where: { id: existing.id },
             data: {
               name: updateUserDto.name,
-              email: updateUserDto.email,
+              email:
+                updateUserDto.email === undefined
+                  ? undefined
+                  : normalizeEmail(updateUserDto.email),
               passwordHash,
               status: updateUserDto.status,
             },

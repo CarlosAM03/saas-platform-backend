@@ -29,6 +29,8 @@ services:
       JWT_EXPIRES_IN: 8h
       CORS_ORIGINS: http://localhost:4200,http://localhost:3000
       DEV_SEED_PASSWORD: DevOnlyPass123!
+      # Bootstrap never enables registration or needs SMTP credentials.
+      TENANT_REGISTRATION_ENABLED: "false"
       TSC_WATCHFILE: PriorityPollingInterval
       TSC_WATCHDIRECTORY: FixedPollingInterval
     command: ["sh", "-c", "npm run prisma:migrate:deploy && npm run prisma:seed:dev"]
@@ -41,7 +43,17 @@ services:
     depends_on:
       db-init:
         condition: service_completed_successfully
-    environment: *dev-environment
+    # Compose reads .env locally for substitution; do not inject it wholesale.
+    environment:
+      <<: *dev-environment
+      TENANT_REGISTRATION_ENABLED: "${TENANT_REGISTRATION_ENABLED:-false}"
+      PLATFORM_ACTIVATION_URL: "${PLATFORM_ACTIVATION_URL:-http://localhost:4200/#/activate}"
+      SMTP_HOST: "${SMTP_HOST:-smtp-relay.brevo.com}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM: "${SMTP_FROM:-}"
+      SMTP_TLS_MODE: "${SMTP_TLS_MODE:-starttls}"
     command: ["npm", "run", "start:dev"]
     volumes:
       - ./src:/app/src

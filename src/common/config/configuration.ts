@@ -1,3 +1,5 @@
+import { validateRegistrationConfig } from './tenant-registration.config';
+
 export function validateEnvironment(environment: Record<string, unknown>) {
   const requiredVariables = [
     'NODE_ENV',
@@ -60,5 +62,9 @@ export function validateEnvironment(environment: Record<string, unknown>) {
         'Production CORS_ORIGINS must contain explicit HTTPS origins',
       );
   }
-  return { ...environment, PORT: port };
+  return {
+    ...environment,
+    PORT: port,
+    ...validateRegistrationConfig(environment),
+  };
 }

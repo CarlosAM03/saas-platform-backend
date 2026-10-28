@@ -1,5 +1,16 @@
 # Contratos y disponibilidad de la implementacion
 
+## Registro de tenants (ADR-006)
+
+Autoridad: [ADR-006 aprobado](../ADRs/ADR-006-TenantRegistration-APROBADO.md) y
+[contrato aprobado](platform-api.tenant-registration.approved.yaml), preservados
+sin cambios como evidencia. La propuesta anterior queda sustituida: no usar
+contraseña temporal, oneOf en login ni PLATFORM_LOGIN_URL.
+
+La implementación local añade cinco operaciones y conserva las 33 existentes y
+AuthContext de login. Registro y reenvío desactivados por defecto. La documentación
+operativa y los gates pendientes están en [Tenant Registration](../../src/tenant-registration/README.md).
+
 ## Contrato objetivo aprobado
 
 `platform-api.v1.yaml` conserva el contrato publico baseline, incluidas las capacidades futuras de Jobs. No debe interpretarse como una declaracion de que todo esta implementado hoy.
@@ -8,7 +19,7 @@
 
 ## Documento que muestra Swagger
 
-`src/common/openapi/deployment-document.ts` lee el contrato publico y prepara una vista de la implementacion para `/api/docs` y `/api/docs-json`. No escribe ni modifica el YAML objetivo.
+`src/common/openapi/deployment-document.ts` lee el contrato publico y prepara una vista de la implementacion para `/api/docs` y `/api/docs-json`. No escribe ni modifica el YAML objetivo. En esta rama compone únicamente las cinco rutas y esquemas nuevos del aprobado ADR-006 mediante `tenant-registration-document.ts`, sin reemplazar las 33 operaciones core. La vista indica versión 1.1.0 y disponibilidad por flag; no acredita habilitación productiva.
 
 | Operacion Jobs | Disponibilidad actual |
 | --- | --- |
