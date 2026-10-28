@@ -2,10 +2,10 @@
 
 Fecha: 28/10/2026, America/Tijuana (UTC−07). Ejecutor: Codex, G1 local.
 Rama: feat/tenant-register. Baseline: ca1e7c9d55d4cad73430801140593b58cb7c413b.
-Implementación: f021f1936d39f3ab3421d300b4d6261a133eb9fb; laboratorio: 3be7e4ed033a79add4183701911936f7a291cd63.
-Las corridas previas al commit se hicieron sobre ca1e7c9 + cambios del worktree que quedaron versionados en esos commits; no se atribuyen al baseline intacto. La corrida posterior al commit se identifica en registros-QA.jsonl. Entorno: Docker Linux, Node20.20.2, Prisma5.22.0, PostgreSQL16 desechable. Datos exclusivamente sintéticos; ninguna credencial/URL productiva se utilizó.
+Implementación: f021f1936d39f3ab3421d300b4d6261a133eb9fb; laboratorio: 3be7e4ed033a79add4183701911936f7a291cd63; ensayos adicionales: 514dca4. Corrida integral final: 5e986cc850dd45e352892bde56d4117cfffebfb3.
+Las primeras corridas se hicieron sobre ca1e7c9 + cambios del worktree; el diagnóstico de login se añadió sobre3be7e4e y quedó versionado en514dca4. Las corridas posteriores identifican su SHA en los registros; no se atribuyen al baseline intacto. La corrida posterior al commit se identifica en registros-QA.jsonl. Entorno: Docker Linux, Node20.20.2, Prisma5.22.0, PostgreSQL16 desechable. Datos exclusivamente sintéticos; ninguna credencial/URL productiva se utilizó.
 
-Dictamen del alcance técnico local: **G1 PASS**, sujeto a comprobar nuevamente los tres jobs del HEAD documental final en PR10 antes de la entrega. El registro final de SHA/run se conserva en [PR10](https://github.com/CarlosAM03/saas-platform-backend/pull/10) y en el cierre del chat; no se extrapola CI de3be7e4e a otro HEAD.
+Dictamen del alcance técnico local: **G1 PASS**. Los tres jobs del HEAD documental5e986cc fueron comprobados SUCCESS y el ensayo completo desde ese SHA terminó PASS. Este cierre solo añade evidencia; el nuevo HEAD documental se verifica otra vez en PR10 antes de entregar. El registro final de SHA/run se conserva en [PR10](https://github.com/CarlosAM03/saas-platform-backend/pull/10) y en el cierre del chat; no se extrapola CI de3be7e4e a otro HEAD.
 
 | Gate / alcance | Resultado |
 | --- | --- |

@@ -2,8 +2,8 @@
 
 Fecha: 28/10/2026, America/Tijuana (UTC−07). Ejecutor: Codex, G1 local.
 Rama: feat/tenant-register. Baseline: ca1e7c9d55d4cad73430801140593b58cb7c413b.
-Implementación: f021f1936d39f3ab3421d300b4d6261a133eb9fb; laboratorio: 3be7e4ed033a79add4183701911936f7a291cd63.
-Las corridas previas al commit se hicieron sobre ca1e7c9 + cambios del worktree que quedaron versionados en esos commits; no se atribuyen al baseline intacto. La corrida posterior al commit se identifica en registros-QA.jsonl. Entorno: Docker Linux, Node20.20.2, Prisma5.22.0, PostgreSQL16 desechable. Datos exclusivamente sintéticos; ninguna credencial/URL productiva se utilizó.
+Implementación: f021f1936d39f3ab3421d300b4d6261a133eb9fb; laboratorio: 3be7e4ed033a79add4183701911936f7a291cd63; ensayos adicionales: 514dca4. Corrida integral final: 5e986cc850dd45e352892bde56d4117cfffebfb3.
+Las primeras corridas se hicieron sobre ca1e7c9 + cambios del worktree; el diagnóstico de login se añadió sobre3be7e4e y quedó versionado en514dca4. Las corridas posteriores identifican su SHA en los registros; no se atribuyen al baseline intacto. La corrida posterior al commit se identifica en registros-QA.jsonl. Entorno: Docker Linux, Node20.20.2, Prisma5.22.0, PostgreSQL16 desechable. Datos exclusivamente sintéticos; ninguna credencial/URL productiva se utilizó.
 
 Estado del ensayo preparatorio: PASS. G2_REAL_DATA = NOT RUN.
 
@@ -41,3 +41,7 @@ Durante construcción del harness se corrigieron una ruta mal escrita de Jobs, l
 Replayqa1 conserva prospector-g1-qa1-pg, prospector-g1-qa1-tools y proxy HTTPS local3444 activos, etiquetados synthetic. La ejecución manual conserva además prospector-g1-pg con g1_history_2/g1_history_3. Ninguna base contiene ACME real.
 
 Repetición desde raíz: [runbook](../RUNBOOK.md). Para G2 formal: respaldo restaurable certificado del owner, copia privada aislada, auditoría real, verificación de objetos Supabase/versión, permisos segregados y nuevo registro. Nunca usar prepare/seed del laboratorio sobre una copia real. Supabase/Render/Vercel no fueron contactados.
+
+## Repetición final sobre SHA versionado
+
+Comando ejecutado: ./codex/backend-adr006/lab/Invoke-G1.ps1 -RunId final -HttpsPort 3445 -Subnet 172.30.67.0/24. Fuente exacta5e986cc850dd45e352892bde56d4117cfffebfb3; rama feat/tenant-register; PostgreSQL16 sintético en otra red y tmpfs nuevos. Terminó28/10/2026 a22:19:21UTC (15:19:21Tijuana), PASS. Incluye113unitarias/84HTTP/59PG, guardas remotas, dos vueltas de migración/restore,59PG adicionales sobre poblada, huellas intactas, caso de login literal antiguo, TLS/CORS/429 y segundo clienteTCP. El runtime corre con UID1000. [Registros exactos sanitizados](registros-final-5e986cc.jsonl). PostgreSQL y proxy del laboratorio final permanecen activos, sin datos reales. Riesgo residual: G2_REAL_DATA y G3–G6 NOT RUN.

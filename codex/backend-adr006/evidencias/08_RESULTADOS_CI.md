@@ -2,8 +2,8 @@
 
 Fecha: 28/10/2026, America/Tijuana (UTC−07). Ejecutor: Codex, G1 local.
 Rama: feat/tenant-register. Baseline: ca1e7c9d55d4cad73430801140593b58cb7c413b.
-Implementación: f021f1936d39f3ab3421d300b4d6261a133eb9fb; laboratorio: 3be7e4ed033a79add4183701911936f7a291cd63.
-Las corridas previas al commit se hicieron sobre ca1e7c9 + cambios del worktree que quedaron versionados en esos commits; no se atribuyen al baseline intacto. La corrida posterior al commit se identifica en registros-QA.jsonl. Entorno: Docker Linux, Node20.20.2, Prisma5.22.0, PostgreSQL16 desechable. Datos exclusivamente sintéticos; ninguna credencial/URL productiva se utilizó.
+Implementación: f021f1936d39f3ab3421d300b4d6261a133eb9fb; laboratorio: 3be7e4ed033a79add4183701911936f7a291cd63; ensayos adicionales: 514dca4. Corrida integral final: 5e986cc850dd45e352892bde56d4117cfffebfb3.
+Las primeras corridas se hicieron sobre ca1e7c9 + cambios del worktree; el diagnóstico de login se añadió sobre3be7e4e y quedó versionado en514dca4. Las corridas posteriores identifican su SHA en los registros; no se atribuyen al baseline intacto. La corrida posterior al commit se identifica en registros-QA.jsonl. Entorno: Docker Linux, Node20.20.2, Prisma5.22.0, PostgreSQL16 desechable. Datos exclusivamente sintéticos; ninguna credencial/URL productiva se utilizó.
 
 La evidencia CI se obtiene de GitHub, separada de las ejecuciones locales. No se infiere PASS por la existencia de pruebas ni por un commit anterior.
 
@@ -23,3 +23,9 @@ Baseline original:90 unitarias,84HTTP,35PostgreSQL. Final:113 unitarias,84HTTP,5
 npm audit final: ocho LOW en tooling transitivo deepmerge; cero moderate/high/critical. npm audit --omit=dev: cero vulnerabilidades. No se hizo downgrade/force fix de Nest/Jest para ocultar LOW. Estado: PASS para gates existentes; riesgo residual LOW de desarrollo conocido.
 
 El HEAD final solo se declara listo en el handoff externo tras comprobar los tres jobs de ese SHA. G2/G3–G6 y pruebas remotas productivas no quedan certificados por Actions.
+
+## Cierre posterior de CI sobre la entrega 5e986cc
+
+Verificado el28/10/2026: HEAD5e986cc850dd45e352892bde56d4117cfffebfb3, [run40778515211](https://github.com/CarlosAM03/saas-platform-backend/actions/runs/40778515211), conclusiónSUCCESS. Jobs: quality123133929101 SUCCESS, postgres-integration123133929173 SUCCESS, docker-build123133928948 SUCCESS. Esta evidencia sí incluye el commit documental5e986cc. Esperado: tresSUCCESS; observado: tresSUCCESS; PASS. Entorno: GitHub Actions Node20/PostgreSQL16, rama feat/tenant-register.
+
+Después se archivaron únicamente nuevos resultados documentales. El CI del commit que los incorpora se comprueba otra vez y se registra con su SHA/run en la descripción del PR10; no se extrapola este run a un SHA posterior.
