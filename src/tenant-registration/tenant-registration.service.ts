@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -40,6 +41,7 @@ export class TenantRegistrationService {
     const email = normalizeEmail(dto.ownerEmail);
     try {
       const created = await this.persistence.serializable(async (tx) => {
+        await this.requireCurrentAdmin(tx, actor.userId);
         const tenant = await tx.tenant.create({
           data: {
             name: dto.tenantName.trim(),
@@ -143,6 +145,10 @@ export class TenantRegistrationService {
   async resend(tenantId: string) {
     this.requireEnabled();
     const data = await this.persistence.serializable(async (tx) => {
+      await this.requireCurrentAdmin(
+        tx,
+        this.context.getRequiredContext().userId,
+      );
       const found = await tx.tenantOnboarding.findUnique({
         where: { tenantId },
         select: { id: true },
@@ -167,5 +173,20 @@ export class TenantRegistrationService {
       data.tenantName,
     );
     return this.get(tenantId);
+  }
+
+  private async requireCurrentAdmin(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR SHARE`;
+    const actor = await tx.user.findUnique({ where: { id: userId } });
+    if (
+      !actor ||
+      actor.platformRole !== 'ADMIN' ||
+      actor.status !== 'ACTIVO' ||
+      actor.mustChangePassword
+    )
+      throw new ForbiddenException('Current platform administration required');
   }
 }

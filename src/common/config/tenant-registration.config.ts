@@ -9,12 +9,8 @@ export function validateRegistrationConfig(env: Record<string, unknown>) {
   if (!enabled) return { TENANT_REGISTRATION_ENABLED: false };
   for (const key of [
     'PLATFORM_ACTIVATION_URL',
-    'SMTP_HOST',
-    'SMTP_PORT',
-    'SMTP_USER',
-    'SMTP_PASSWORD',
-    'SMTP_FROM',
-    'SMTP_TLS_MODE',
+    'BREVO_API_KEY',
+    'BREVO_FROM_EMAIL',
   ]) {
     if (typeof env[key] !== 'string' || !env[key].trim())
       throw new Error(`Missing registration configuration: ${key}`);
@@ -37,12 +33,12 @@ export function validateRegistrationConfig(env: Record<string, unknown>) {
       'PLATFORM_ACTIVATION_URL must be a trusted HTTP(S) frontend URL, HTTPS in production, without credentials/query; optional #/activate',
     );
   }
-  const port = Number(env.SMTP_PORT);
-  if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error('Invalid SMTP_PORT');
-  if (!['implicit', 'starttls'].includes(String(env.SMTP_TLS_MODE)))
-    throw new Error('SMTP_TLS_MODE must be implicit or starttls');
-  if (!isEmail(String(env.SMTP_FROM)) || /[\r\n]/.test(String(env.SMTP_HOST)))
-    throw new Error('Invalid SMTP_FROM or SMTP_HOST');
+  if (!isEmail(String(env.BREVO_FROM_EMAIL)))
+    throw new Error('Invalid BREVO_FROM_EMAIL');
+  if (
+    /[\r\n]/.test(String(env.BREVO_API_KEY)) ||
+    String(env.BREVO_API_KEY).trim() !== env.BREVO_API_KEY
+  )
+    throw new Error('Invalid BREVO_API_KEY');
   return { TENANT_REGISTRATION_ENABLED: true };
 }

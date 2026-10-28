@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { validateRegistrationConfig } from '../common/config/tenant-registration.config';
 export type DeliveryResult = 'ACCEPTED' | 'FAILED' | 'UNKNOWN';
 const escape = (s: string) =>
   s.replace(
@@ -19,6 +19,17 @@ export class WelcomeMailService {
     tenant: string,
     token: string,
   ): Promise<DeliveryResult> {
+    try {
+      validateRegistrationConfig({
+        TENANT_REGISTRATION_ENABLED: true,
+        NODE_ENV: this.config.get('NODE_ENV'),
+        PLATFORM_ACTIVATION_URL: this.config.get('PLATFORM_ACTIVATION_URL'),
+        BREVO_API_KEY: this.config.get('BREVO_API_KEY'),
+        BREVO_FROM_EMAIL: this.config.get('BREVO_FROM_EMAIL'),
+      });
+    } catch {
+      return 'FAILED';
+    }
     const url = new URL(
       this.config.getOrThrow<string>('PLATFORM_ACTIVATION_URL'),
     );
@@ -33,68 +44,65 @@ export class WelcomeMailService {
       '\nActiva tu cuenta y elige tu contraseña: ' +
       url.href +
       '\nEl enlace vence en 24 horas y solo puede utilizarse una vez. Si necesitas otro, contacta al administrador.';
-    const transport = nodemailer.createTransport({
-      host: this.config.getOrThrow<string>('SMTP_HOST'),
-      port: Number(this.config.get('SMTP_PORT')),
-      secure: this.config.get('SMTP_TLS_MODE') === 'implicit',
-      requireTLS: this.config.get('SMTP_TLS_MODE') === 'starttls',
-      auth: {
-        user: this.config.getOrThrow<string>('SMTP_USER'),
-        pass: this.config.getOrThrow<string>('SMTP_PASSWORD'),
-      },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000,
-      socketTimeout: 15000,
-      logger: false,
-      debug: false,
-      tls: { rejectUnauthorized: true },
-    });
-    const close = () => {
-      try {
-        transport.close();
-      } catch {
-        /* Never surface provider errors. */
-      }
-    };
+    const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const sent = transport
-        .sendMail({
-          from: this.config.getOrThrow<string>('SMTP_FROM'),
-          to: email,
+      const sent = fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        redirect: 'error',
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: {
+          'api-key': this.config.getOrThrow<string>('BREVO_API_KEY'),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { email: this.config.getOrThrow<string>('BREVO_FROM_EMAIL') },
+          to: [{ email }],
           subject: 'Bienvenido: activa tu cuenta',
-          text,
-          html:
+          textContent: text,
+          htmlContent:
             '<p>' +
             escape(text).replace(/\n/g, '<br>') +
             '</p><p><a href="' +
             escape(url.href) +
             '">Activar cuenta</a></p>',
-          disableFileAccess: true,
-          disableUrlAccess: true,
-        })
-        .then((r) =>
-          r.accepted.length ? ('ACCEPTED' as const) : ('FAILED' as const),
-        );
+        }),
+      }).then(async (response): Promise<DeliveryResult> => {
+        if (response.status >= 400 && response.status < 500) {
+          await response.body?.cancel();
+          return 'FAILED';
+        }
+        if (response.status !== 201) {
+          await response.body?.cancel();
+          return 'UNKNOWN';
+        }
+        const body: unknown = await response.json();
+        return typeof body === 'object' &&
+          body !== null &&
+          'messageId' in body &&
+          typeof body.messageId === 'string' &&
+          body.messageId.length > 0
+          ? 'ACCEPTED'
+          : 'UNKNOWN';
+      });
       return await Promise.race([
         sent,
         new Promise<'UNKNOWN'>((resolve) => {
           timer = setTimeout(() => {
-            close();
+            controller.abort();
             resolve('UNKNOWN');
           }, 15000);
         }),
       ]);
-    } catch (error: unknown) {
-      // Never log SMTP errors: provider errors can contain recipient, credentials or message.
-      const code =
-        typeof error === 'object' && error !== null && 'responseCode' in error
-          ? error.responseCode
-          : undefined;
-      return typeof code === 'number' && code >= 400 ? 'FAILED' : 'UNKNOWN';
+    } catch {
+      // Provider bodies/errors may contain credentials, links or recipients.
+      // An interrupted request has an uncertain delivery outcome; never retry.
+      return 'UNKNOWN';
     } finally {
       if (timer) clearTimeout(timer);
-      close();
+      controller.abort();
     }
   }
 }

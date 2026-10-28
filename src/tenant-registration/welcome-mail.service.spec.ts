@@ -1,66 +1,107 @@
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
 import { WelcomeMailService } from './welcome-mail.service';
 
-jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
-describe('Welcome SMTP transport (no real messages)', () => {
-  const sendMail = jest.fn();
-  const close = jest.fn();
+describe('Brevo HTTPS transport, no network or real messages', () => {
   let service: WelcomeMailService;
+  let http: jest.SpiedFunction<typeof fetch>;
+  const config = {
+    PLATFORM_ACTIVATION_URL: 'https://frontend.example/#/activate',
+    BREVO_API_KEY: 'synthetic-not-real',
+    BREVO_FROM_EMAIL: 'sender@example.com',
+  };
+  const send = () =>
+    service.send('owner@example.com', '<img src=x>', 'Org & Co', 'opaque');
   beforeEach(() => {
-    jest.clearAllMocks();
-    (nodemailer.createTransport as jest.Mock).mockReturnValue({
-      sendMail,
-      close,
-    });
-    service = new WelcomeMailService(
-      new ConfigService({
-        PLATFORM_ACTIVATION_URL: 'https://frontend.example/#/activate',
-        SMTP_HOST: 'smtp.invalid',
-        SMTP_PORT: '465',
-        SMTP_USER: 'test',
-        SMTP_PASSWORD: 'not-real',
-        SMTP_FROM: 'sender@example.com',
-        SMTP_TLS_MODE: 'implicit',
+    http = jest.spyOn(globalThis, 'fetch');
+    service = new WelcomeMailService(new ConfigService(config));
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+  it('sends one authenticated HTTPS request and escaped HTML with trusted fragment', async () => {
+    http.mockResolvedValue(
+      new Response(JSON.stringify({ messageId: 'synthetic-message' }), {
+        status: 201,
       }),
     );
-  });
-  afterEach(() => jest.useRealTimers());
-  it('escapes HTML, uses configured fragment URL and includes no password', async () => {
-    sendMail.mockResolvedValue({ accepted: ['owner@example.com'] });
-    expect(
-      await service.send(
-        'owner@example.com',
-        '<img src=x>',
-        'Org & Co',
-        'opaque',
-      ),
-    ).toBe('ACCEPTED');
-    const calls = sendMail.mock.calls as unknown[][];
-    const message = calls[0][0] as { text: string; html: string };
-    expect(message.text).toContain(
+    expect(await send()).toBe('ACCEPTED');
+    expect(http).toHaveBeenCalledTimes(1);
+    const [url, options] = http.mock.calls[0];
+    expect(url).toBe('https://api.brevo.com/v3/smtp/email');
+    expect(options?.redirect).toBe('error');
+    expect(options?.headers).toMatchObject({ 'api-key': config.BREVO_API_KEY });
+    const body = JSON.parse(options?.body as string) as {
+      htmlContent: string;
+      textContent: string;
+      sender: { email: string };
+    };
+    expect(body.htmlContent).toContain('&lt;img src=x&gt;');
+    expect(body.htmlContent).toContain('Org &amp; Co');
+    expect(body.textContent).toContain(
       'https://frontend.example/#/activate?code=opaque',
     );
-    expect(message.html).toContain('&lt;img src=x&gt;');
-    expect(message.html).toContain('Org &amp; Co');
-    expect(message.text).toContain('24 horas');
-    expect(close).toHaveBeenCalled();
+    expect(body.textContent).toContain('24 horas');
+    expect(body.sender.email).toBe(config.BREVO_FROM_EMAIL);
+    expect(body).not.toHaveProperty('password');
   });
-  it('sanitizes transport rejection into a status', async () => {
-    sendMail.mockRejectedValue({
-      responseCode: 550,
-      message: 'sensitive provider response',
-    });
-    expect(
-      await service.send('owner@example.com', 'Owner', 'Org', 'opaque'),
-    ).toBe('FAILED');
+  it.each([400, 401, 403, 429])(
+    'HTTP %s becomes FAILED without logging or retry',
+    async (status) => {
+      const log = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+      http.mockResolvedValue(
+        new Response('sensitive provider body', { status }),
+      );
+      expect(await send()).toBe('FAILED');
+      expect(http).toHaveBeenCalledTimes(1);
+      expect(log).not.toHaveBeenCalled();
+    },
+  );
+  it.each([500, 502, 503, 302, 200])(
+    'HTTP %s has uncertain outcome and no retry',
+    async (status) => {
+      http.mockResolvedValue(
+        new Response('sensitive provider body', { status }),
+      );
+      expect(await send()).toBe('UNKNOWN');
+      expect(http).toHaveBeenCalledTimes(1);
+    },
+  );
+  it.each(['{}', 'null', '{"messageId":42}', 'not-json'])(
+    'unexpected 201 body is sanitized: %s',
+    async (body) => {
+      http.mockResolvedValue(new Response(body, { status: 201 }));
+      expect(await send()).toBe('UNKNOWN');
+    },
+  );
+  it('sanitizes network errors containing secrets and links', async () => {
+    http.mockRejectedValue(
+      new Error(
+        'sensitive provider response with credentials and activation link',
+      ),
+    );
+    expect(await send()).toBe('UNKNOWN');
+    expect(http).toHaveBeenCalledTimes(1);
   });
-  it('bounds total send time to 15 seconds and closes transport', async () => {
+  it('bounds request plus response body to 15 seconds and aborts', async () => {
     jest.useFakeTimers();
-    sendMail.mockReturnValue(new Promise(() => undefined));
-    const result = service.send('owner@example.com', 'Owner', 'Org', 'opaque');
+    http.mockImplementation(() => new Promise(() => undefined));
+    const pending = send();
     await jest.advanceTimersByTimeAsync(15000);
-    expect(await result).toBe('UNKNOWN');
-    expect(close).toHaveBeenCalled();
+    expect(await pending).toBe('UNKNOWN');
+    expect(http.mock.calls[0][1]?.signal?.aborted).toBe(true);
+  });
+  it.each([
+    { BREVO_API_KEY: '' },
+    { BREVO_FROM_EMAIL: 'bad' },
+    { PLATFORM_ACTIVATION_URL: 'https://user:secret@frontend.example/' },
+  ])('invalid config fails without a request', async (override) => {
+    service = new WelcomeMailService(
+      new ConfigService({ ...config, ...override }),
+    );
+    expect(await send()).toBe('FAILED');
+    expect(http).not.toHaveBeenCalled();
   });
 });

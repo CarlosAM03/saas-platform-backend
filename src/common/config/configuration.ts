@@ -1,6 +1,8 @@
 import { validateRegistrationConfig } from './tenant-registration.config';
+import { trustedProxies } from './trusted-proxy';
 
 export function validateEnvironment(environment: Record<string, unknown>) {
+  trustedProxies(environment.TRUSTED_PROXY_CIDRS);
   const requiredVariables = [
     'NODE_ENV',
     'PORT',
