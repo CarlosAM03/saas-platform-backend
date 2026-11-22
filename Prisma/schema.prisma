@@ -256,7 +256,7 @@ model CampaignActivity {
   reason        String?
   correctsId    String?             @map("corrects_id")
 
-  participation CampaignProspect @relation(fields: [campaignId, prospectId], references: [campaignId, prospectId])
+  participation CampaignProspect @relation(fields: [campaignId, prospectId], references: [campaignId, prospectId], onDelete: Restrict)
   actor         User? @relation("ActivityActor", fields: [actorUserId], references: [id])
 
   @@index([tenantId, campaignId, prospectId, recordedAt])
@@ -275,7 +275,7 @@ model ProspectProvenance {
   recordedAt  DateTime               @default(now()) @map("recorded_at")
   details     Json?
 
-  prospect Prospect @relation(fields: [prospectId], references: [id])
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Restrict)
   actor    User? @relation("ProvenanceActor", fields: [actorUserId], references: [id])
 
   @@index([tenantId, prospectId, recordedAt])

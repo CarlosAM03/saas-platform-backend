@@ -18,6 +18,8 @@
 - T32: **NO_EJECUTADO** (E2E Flutter futuro)
 - Defectos abiertos y riesgo residual: migración reparada durante G4; contrato y cobertura específica pendientes
 - Resultado gate: `BLOCKED_PARA_CIERRE_TOTAL`
+- Revisión estática posterior al registro inicial: `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b`; los hallazgos `REV-01` (cascadas destructivas) y `REV-02` (procedencia legacy no verificable) quedaron corregidos mediante la migración nueva `20261123000100_campaign_participation_history_forward_fix`, sin editar la migración histórica. Verificados en PostgreSQL desechable; detalle en `HALLAZGOS_REVISION_C75AD08.md`.
+- QA/contrato/datos específicos en este turno: `NOT_RUN`; la cuota de subagentes impidió iniciar esas auditorías. No se deriva PASS de esta limitación.
 
 | Test | SHA | Comando / fixture | Resultado | Evidencia | Limitación |
 |---|---|---|---|---|---|
@@ -29,3 +31,12 @@
 | T28 | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | migración aplicación PostgreSQL | NO_EJECUTADO ESPECÍFICO | — | solo aplicación DDL demostrada |
 | T30 | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | `without-prospector.e2e-spec.ts` | PASS | suite E2E | módulos externos intactos |
 | T32 | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | — | NO_EJECUTADO | — | Flutter fuera de backend |
+| Build/Prisma forward-fix | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | `npm run prisma:generate`; `npm run build` | PASS | ejecución local, 2026-11-22T12:32:25-08:00 | pendiente commit; no valida todos los AC |
+| T28 — forward-fix legacy | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | `docker compose --profile test run --build --rm test-postgres`; schema aislado `campaign_fix_<uuid>` | PASS | `test/campaign-participation-migration.postgres-spec.ts`; 61/61 PostgreSQL PASS | cubre solo filas sintéticas de la migración anterior, no datos reales |
+| REV-01 — historial append-only | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | mismo comando PostgreSQL | PASS | la suite rechaza borrar participación con actividad y prospecto con procedencia; 61/61 PASS | pendiente commit y revisión independiente posterior |
+| Regresión unitaria | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | `npm run test:unit:ci` | PASS | 113/113 PASS, 2026-11-22T12:33:46-08:00 | no cubre todos los AC sprint |
+| Regresión HTTP E2E | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | `npm run test:e2e:ci` | PASS | 84/84 PASS, 2026-11-22T12:33:46-08:00 | no sustituye T31 específico ni paridad Swagger |
+| T31 — guardas de rutas nuevas | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | `npm run test:e2e:ci`; 9 rutas de participación/dashboard añadidas a `campaigns.e2e-spec.ts` | PARCIAL PASS | 84/84 E2E PASS, 2026-11-22T12:36:22-08:00 | valida 401 sin sesión y 403 sin tenant; falta lectura/escritura cruzada con IDs de tenant B |
+| Paridad OpenAPI/Swagger — drift inicial | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | comparación estática de controladores, YAML y `deploymentDocument()` | FAIL | `DRIFT_CONTRATO_C75AD08.md` | evidencia histórica: rutas nuevas ausentes de YAML y Swagger servido |
+| Paridad OpenAPI estática — reconciliación | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | `node -e "...js-yaml...platform-api.v1.yaml"`; revisión independiente código→YAML | PARCIAL PASS | `YAML_OK paths=34`; revisión sin hallazgos de severidad; rutas CP/P4 `CONTRACT_ONLY` | cambios sin commit; Swagger servido no verificado; no acredita `AVAILABLE` |
+| Swagger servido | `c75ad08c2619e8c32eec6661a3f9ad8b5a38eb3b` + worktree no confirmado | `Invoke-RestMethod http://localhost:3000/api/docs/json` | NOT_RUN | no hubo app escuchando en localhost | requiere levantar aplicación desde SHA confirmado y comparar documento servido |

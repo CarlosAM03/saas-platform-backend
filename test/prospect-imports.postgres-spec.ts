@@ -55,7 +55,9 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
   });
   afterEach(async () => {
     jest.restoreAllMocks();
+    await prisma.campaignActivity.deleteMany({ where: { tenantId } });
     await prisma.campaignProspect.deleteMany({ where: { campaignId } });
+    await prisma.prospectProvenance.deleteMany({ where: { tenantId } });
     await prisma.prospect.deleteMany({ where: { tenantId } });
   });
   afterAll(async () => {

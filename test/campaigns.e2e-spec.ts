@@ -245,6 +245,23 @@ describe('Campaigns (e2e)', () => {
         http().patch(`/api/v1/campaigns/${a}`).send({ name: 'Changed' }),
         http().delete(`/api/v1/campaigns/${a}`),
         http().get(`/api/v1/campaigns/${a}/prospects`),
+        http().get(`/api/v1/campaigns/${a}/dashboard`),
+        http().get(`/api/v1/campaigns/${a}/prospects/prospect-a/participation`),
+        http()
+          .patch(`/api/v1/campaigns/${a}/prospects/prospect-a/stage`)
+          .send({ stage: 'CONTACTADO' }),
+        http()
+          .patch(`/api/v1/campaigns/${a}/prospects/prospect-a/evaluation`)
+          .send({ evaluation: 'APTO' }),
+        http().get(`/api/v1/campaigns/${a}/prospects/prospect-a/responsibles`),
+        http()
+          .put(`/api/v1/campaigns/${a}/prospects/prospect-a/responsible`)
+          .send({ responsibleId: 'user-owner' }),
+        http().delete(`/api/v1/campaigns/${a}/prospects/prospect-a/responsible`),
+        http().get(`/api/v1/campaigns/${a}/prospects/prospect-a/activities`),
+        http()
+          .post(`/api/v1/campaigns/${a}/prospects/prospect-a/activities`)
+          .send({ type: 'NOTE', content: 'Synthetic note' }),
       ];
       const responses = await Promise.all(
         requests.map((call) =>
@@ -252,7 +269,7 @@ describe('Campaigns (e2e)', () => {
         ),
       );
       expect(responses.map((response) => response.status)).toEqual(
-        Array(6).fill(token ? 403 : 401),
+        Array(15).fill(token ? 403 : 401),
       );
     }
     expect(campaigns).toHaveLength(3);
