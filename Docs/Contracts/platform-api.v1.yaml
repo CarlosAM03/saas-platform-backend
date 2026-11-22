@@ -7,9 +7,8 @@ info:
     de Prisma; el tenant se resuelve desde el contexto autenticado.
     F4 implementa Auth, Users y Health. Tenants, Campaigns, Prospects y
     Prospecting Jobs conservan su contrato objetivo para fases posteriores.
-    Las rutas CP marcadas con x-contract-status: CONTRACT_ONLY están implementadas
-    en código, pero permanecen CONTRACT_ONLY hasta contar con evidencia de prueba
-    atribuible al SHA y verificación del Swagger servido.
+    Las rutas CP marcadas con x-contract-status: AVAILABLE están implementadas
+    y verificadas en suites funcionales y Swagger sobre el SHA del sprint.
 servers:
   - url: https://api.example.invalid
     description: Placeholder; el entorno real se configura fuera del contrato.
@@ -398,7 +397,7 @@ paths:
       summary: Dashboard operativo de una campaña
       description: Agregados actuales de participaciones de la campaña y tenant seleccionados; no es el dashboard global. responsibility usa SIN_ASIGNAR o NO_ELEGIBLE:{userId} cuando corresponde.
       operationId: getCampaignDashboard
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignId' }]
       responses:
@@ -411,7 +410,7 @@ paths:
       tags: [Campaigns, Prospects]
       summary: Consulta el contexto de participación de un prospecto
       operationId: getCampaignParticipation
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }]
       responses:
@@ -424,7 +423,7 @@ paths:
       tags: [Campaigns, Prospects]
       summary: Cambia la etapa comercial contextual
       operationId: updateCampaignParticipationStage
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateStageRequest' } } } }
@@ -440,7 +439,7 @@ paths:
       summary: Cambia la evaluación contextual
       description: NO_APTO exige reason no vacío.
       operationId: updateCampaignParticipationEvaluation
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateEvaluationRequest' } } } }
@@ -455,7 +454,7 @@ paths:
       tags: [Campaigns, Prospects]
       summary: Lista responsables elegibles del tenant
       operationId: listEligibleCampaignResponsibles
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }]
       responses:
@@ -468,7 +467,7 @@ paths:
       tags: [Campaigns, Prospects]
       summary: Asigna responsable elegible a una participación
       operationId: assignCampaignParticipationResponsible
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AssignResponsibleRequest' } } } }
@@ -482,7 +481,7 @@ paths:
       tags: [Campaigns, Prospects]
       summary: Quita el responsable de una participación
       operationId: removeCampaignParticipationResponsible
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }]
       responses:
@@ -495,7 +494,7 @@ paths:
       tags: [Campaigns, Prospects]
       summary: Lista bitácora contextual paginada
       operationId: listCampaignParticipationActivities
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }]
       responses:
@@ -507,7 +506,7 @@ paths:
       tags: [Campaigns, Prospects]
       summary: Registra una actividad manual o corrección referenciada
       operationId: createCampaignParticipationActivity
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateCampaignActivityRequest' } } } }
@@ -563,7 +562,7 @@ paths:
     post:
       tags: [Prospects]
       operationId: previewProspectImport
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       summary: Previsualiza una importación CSV sin escrituras
       description: |
         ADMIN y OWNER con tenant seleccionado. UTF-8 con/sin BOM, coma o punto y coma;
@@ -613,7 +612,7 @@ paths:
     post:
       tags: [Prospects]
       operationId: confirmProspectImport
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       summary: Confirma una importación CSV atómica
       description: |
         ADMIN y OWNER con tenant seleccionado. Reenviar el mismo archivo del preview.
@@ -716,7 +715,7 @@ paths:
       summary: Busca coincidencias para una alta manual
       description: Requiere ADMIN u OWNER y tenant seleccionado. strongProspect representa una identidad fuerte; candidates son coincidencias débiles por nombre.
       operationId: matchProspect
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateProspectRequest' } } } }
       responses:
@@ -731,7 +730,7 @@ paths:
       summary: Resuelve explícitamente una coincidencia manual
       description: Requiere ADMIN u OWNER y tenant seleccionado. LINK_EXISTING exige candidateId y el servidor vuelve a validar que sigue siendo candidato.
       operationId: resolveProspect
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ResolveProspectRequest' } } } }
       responses:
@@ -746,7 +745,7 @@ paths:
       tags: [Prospects, Campaigns]
       summary: Lista campañas asociadas a un prospecto maestro
       operationId: listProspectCampaigns
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/EntityId' }]
       responses:
@@ -759,7 +758,7 @@ paths:
       tags: [Prospects]
       summary: Lista la procedencia global confirmada del prospecto
       operationId: listProspectProvenance
-      x-contract-status: CONTRACT_ONLY
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/EntityId' }]
       responses:

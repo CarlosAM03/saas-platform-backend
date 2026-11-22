@@ -2,6 +2,22 @@
 
 **ESTADO: EJECUCIÓN PARCIAL — G4 NO CERRADO**
 
+## Resultado actual — 2026-11-22
+
+HEAD probado: `d262f48e9ab6b344c472df60588c2261d377c884`. Fecha: `2026-11-22T14:19:54-08:00`. Rama: `feat/sprint-campana-prospector`.
+
+| ID | Comando | Fixture/entorno | Esperado | Observado | Estado | Limitación |
+|---|---|---|---|---|---|---|
+| BUILD-D262 | `npm run build` | TypeScript/NestJS | compilación sin errores | código 0 | PASS | no acredita AC funcionales |
+| UNIT-D262 | `npm run test:unit:ci` | 11 suites Jest | regresión verde | 113/113 PASS | PASS | suite baseline, no todos los AC CP |
+| HTTP-D262 | `npm run test:e2e:ci` | 7 suites HTTP; fixtures sintéticos | regresión verde | 84/84 PASS | PASS | no sustituye PG ni todos los Txx |
+| PG-D262 | `docker compose --profile test run --build --rm test-postgres` | PostgreSQL 16 desechable; 11 suites | regresión y fixtures críticos verdes | 93/93 PASS | PASS | no cierra G4 ni acredita escenarios ausentes |
+| SWAGGER-D262 | `docker compose up --build --wait api`; `GET /api/docs-json`; `GET /api/docs` | Compose local sintético, puertos locales, mismo HEAD | documentos servidos con HTTP 200 | JSON 200, 39 rutas/51 operaciones; UI 200 | PASS para disponibilidad HTTP | no resuelve el drift contractual registrado en `DRIFT_CONTRATO_C75AD08.md` |
+| CONTRACT-CP-D262 | `npm run test:e2e:ci -- test/without-prospector.e2e-spec.ts`; `npm run build` | Swagger/YAML CP sobre worktree basado en `d262f48` | rutas CP presentes y marcadas `AVAILABLE` | 5/5 PASS; build código 0 | PASS PARCIAL contractual | no acredita todos los flujos T01–T31 |
+| T01-T31-D262 | `docker compose --profile test run --build --rm test-postgres` | PostgreSQL 16 desechable; 11 suites | matriz T01–T31 por caso | 94/94 PASS en la suite PostgreSQL completa | COBERTURA PARCIAL | T03, T05, T08, T16, T18, T20 permanecen NOT_RUN; T01/T25 permanecen PARCIAL; T32 fuera de backend |
+
+G4 permanece abierto: faltan reconciliación por AC/T01–T31, rendimiento sintético medido y revisión independiente. T32 sigue reservado a Flutter.
+
 ## Resultado más reciente — 2026-11-22
 
 HEAD probado: `cd7227def8eee323cff3df666c25610486ceeb04`. Build PASS, unitarias 113/113, E2E 84/84 y PostgreSQL 93/93 (antes 61). Se implementaron casos específicos de concurrencia fuerte T07, rechazo seguro CSV T04, legacy T28 e IDs cruzados T31, con cobertura y límites por caso en [RESULTADOS_CD7227D.md](RESULTADOS_CD7227D.md). Se corrigió el 500 de creación de actividad con participación ajena para devolver 404, sin cambios protegidos. G4 permanece abierto por cobertura completa de AC/T01–T31, revisión independiente y mediciones pendientes; T32 sigue reservado al frontend.

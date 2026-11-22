@@ -2,7 +2,7 @@
 
 **ESTADO: HANDOFF PROVISIONAL — NO LISTO_PARA_ANDRE**
 
-- Backend SHA / branch / PR: `f09fbee77e26b9b0cdfa3581883b87218e7a8f7d`, `feat/sprint-campana-prospector`, PR del sprint pendiente
+- Backend SHA probado / HEAD documental / branch / PR: `cd7227def8eee323cff3df666c25610486ceeb04` / `d262f48e9ab6b344c472df60588c2261d377c884`, `feat/sprint-campana-prospector`, PR del sprint pendiente
 - Contrato servidor JSON/YAML generado vs Swagger observable: código disponible; Swagger/OpenAPI objetivo aún NO_EJECUTADO/NO reconciliado
 - Matriz métodos/roles/requests/responses/errores: matriz provisional de este gate basada en controladores reales
 - Disponibilidad real por operación: `PROVISIONAL` hasta pruebas HTTP específicas y Swagger

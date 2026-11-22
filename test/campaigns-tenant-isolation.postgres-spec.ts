@@ -358,6 +358,126 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
     expect(
       await db.campaignActivity.count({ where: { tenantId: tenants[0] } }),
     ).toBe(2);
+  });
+  it('T09-T22 executes contextual stage, evaluation, activity, responsible, filters and dashboard', async () => {
+    const campaignA2 = await db.campaign.create({
+      data: {
+        tenantId: tenants[0],
+        createdBy: users[0],
+        name: 'Campana A2',
+      },
+    });
+    campaigns.push(campaignA2.id);
+    await db.campaignProspect.create({
+      data: { campaignId: campaignA2.id, prospectId: prospects[0] },
+    });
+
+    await http()
+      .patch(`${base(campaigns[0], prospects[0])}/stage`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ stage: 'CONTACTADO' })
+      .expect(200);
+    const a2Before = await db.campaignProspect.findUniqueOrThrow({
+      where: {
+        campaignId_prospectId: {
+          campaignId: campaignA2.id,
+          prospectId: prospects[0],
+        },
+      },
+    });
+    expect(a2Before.commercialStage).toBe('SIN_GESTIONAR');
+
+    await http()
+      .patch(`${base(campaigns[0], prospects[0])}/stage`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ stage: 'CERRADO' })
+      .expect(200);
+    await http()
+      .patch(`${base(campaigns[0], prospects[0])}/stage`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ stage: 'EN_SEGUIMIENTO' })
+      .expect(200);
+
+    await http()
+      .patch(`${base(campaigns[0], prospects[0])}/evaluation`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ evaluation: 'NO_APTO', reason: '   ' })
+      .expect(400);
+    await http()
+      .patch(`${base(campaigns[0], prospects[0])}/evaluation`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ evaluation: 'NO_APTO', reason: 'Synthetic reason' })
+      .expect(200);
+    await http()
+      .patch(`${base(campaigns[0], prospects[0])}/evaluation`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ evaluation: 'APTO', reason: 'Changed later' })
+      .expect(200);
+
+    const original = await http()
+      .post(`${base(campaigns[0], prospects[0])}/activities`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ type: 'CALL', content: 'Original synthetic call' })
+      .expect(201);
+    await http()
+      .post(`${base(campaigns[0], prospects[0])}/activities`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({
+        type: 'NOTE',
+        content: 'Synthetic correction',
+        correctsId: body<{ id: string }>(original).data.id,
+      })
+      .expect(201);
+    const activities = await http()
+      .get(`${base(campaigns[0], prospects[0])}/activities?page=1&limit=20`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ data: unknown[] }>(activities).data.length).toBeGreaterThan(1);
+
+    await http()
+      .put(`${base(campaigns[0], prospects[0])}/responsible`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ responsibleId: users[2] })
+      .expect(200);
+    await http()
+      .delete(`${base(campaigns[0], prospects[0])}/responsible`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    const eligible = await http()
+      .get(`${base(campaigns[0], prospects[0])}/responsibles`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(JSON.stringify(eligible.body)).not.toContain(users[1]);
+
+    const filtered = await http()
+      .get(
+        `/api/v1/campaigns/${campaigns[0]}/prospects?stage=EN_SEGUIMIENTO&evaluation=APTO&page=1&limit=10`,
+      )
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ id: string }[]>(filtered).data[0].id).toBe(prospects[0]);
+
+    const dashboard = await http()
+      .get(`/api/v1/campaigns/${campaigns[0]}/dashboard`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ total: number; stages: Record<string, number>; evaluations: Record<string, number> }>(dashboard).data).toMatchObject({
+      total: 1,
+      stages: { EN_SEGUIMIENTO: 1 },
+      evaluations: { APTO: 1 },
+    });
+
+    const campaignsView = await http()
+      .get(`/api/v1/prospects/${prospects[0]}/campaigns`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ campaigns: unknown[] }>(campaignsView).data.campaigns.length).toBeGreaterThanOrEqual(2);
+
+    const provenance = await http()
+      .get(`/api/v1/prospects/${prospects[0]}/provenance`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ data: unknown[] }>(provenance).data.length).toBeGreaterThan(0);
     expect(
       await db.campaignActivity.count({ where: { tenantId: tenants[1] } }),
     ).toBe(1);

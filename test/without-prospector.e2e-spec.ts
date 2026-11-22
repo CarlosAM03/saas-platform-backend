@@ -167,6 +167,49 @@ describe('Platform without Prospector configuration or network', () => {
     expect(
       document.paths['/api/v1/campaigns'].post!.responses['201'],
     ).toBeDefined();
+    for (const [path, method] of [
+      ['/api/v1/campaigns/{id}/dashboard', 'get'],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/participation',
+        'get',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/stage',
+        'patch',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/evaluation',
+        'patch',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/responsibles',
+        'get',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/responsible',
+        'put',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/responsible',
+        'delete',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/activities',
+        'get',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/activities',
+        'post',
+      ],
+      ['/api/v1/prospects/match', 'post'],
+      ['/api/v1/prospects/resolve', 'post'],
+      ['/api/v1/prospects/{id}/campaigns', 'get'],
+      ['/api/v1/prospects/{id}/provenance', 'get'],
+    ] as const) {
+      const operation = document.paths[path][method];
+      expect(operation).toBeDefined();
+      expect(operation!['x-contract-status']).toBe('AVAILABLE');
+    }
     const visit = (value: unknown): void => {
       if (!value || typeof value !== 'object') return;
       for (const [key, child] of Object.entries(value)) {
