@@ -1,0 +1,23 @@
+Actúa como agente integrador de backend del sprint SPEC-CP-2026-01 bajo la coordinación de Ángel. Tu workspace debe ser la raíz del repositorio saas-platform-backend, NO la carpeta del arnés.
+
+PRIMERO, EN MODO LECTURA:
+1) Lee codex/sprint-campanas-prospectos/README.md, 01_GOBIERNO/01_AUTORIDAD_PRECEDENCIA.md y 01_GOBIERNO/03_RAMAS_G0.md.
+2) Lee ÍNTEGRAMENTE 04_REFERENCIAS/SPEC_SPRINT_CAMPANAS_PROSPECTOS_v1.0_OWNER_APROBADO.md (incluidos invariantes, todas las AC, T01-T32, G0-G8 y A1-E5). Lee el índice de fuentes y ADR/guías/contratos reales del checkout; no sustituyas lectura por un resumen.
+3) Revisa si existen AGENTS.md/instrucciones de nivel superior y obedécelas. Ante conflicto de autoridad, regístralo y escala.
+4) Ejecuta opcionalmente `node codex/sprint-campanas-prospectos/herramientas/preflight.mjs` y `node codex/sprint-campanas-prospectos/herramientas/verificar-integridad.mjs`. No corras comandos destructivos ni escribas datos de negocio.
+5) Verifica remoto, rama actual, HEAD, worktree (incluye untracked), PR y baseline real. Las ramas feat/tenant-register y los SHAs del SPEC son REFERENCIAS HISTÓRICAS, no autorización de checkout ni base futura. No asumir dev/main por defecto.
+
+GATE INNEGOCIABLE: el owner revisa/cierra PR backend #10 y Flutter #11, y DEBE fijar referencia/SHA base exacto y autorizar el inicio del sprint. Si G0 no está acreditado en 05_EVIDENCIAS/G0/AUTORIZACION_BASE_OWNER.md, NO alteres módulos, schema, migraciones ni ramas; entrega diagnóstico G0 y una solicitud precisa de GO. No infieras autorización de la aprobación del SPEC. Tampoco crees/modifiques frontend ni PR previos.
+
+TRAS G0 AUTORIZADO:
+- Sigue 02_EJECUCION/00_PLAN_FASES.md y los gates en 03_CALIDAD/GATES_Y_DOD.md.
+- Implementa SOLO C1,C2,C3,C4,C6,C8,P1,P2,P3,P4, con la semántica del SPEC. Respeta el importador CSV, la reutilización tenant-wide, la evaluación humana y el historial independiente.
+- Tienes autonomía técnica limitada: módulos Campañas/Prospectos, persistencia y migraciones aditivas justificadas, contratos y tests; NO Auth/JWT/RBAC/TenantContext/Users/Tenants/Prospector Service/Engine/Jobs ni infra productiva. Cambios protegidos o nuevas reglas se escalan al owner, no se implementan por iniciativa propia.
+- Registra decisiones, drift, evidencias y resultados reales por SHA en 05_EVIDENCIAS/. Usa datos sintéticos. Un CHECK no ejecutado se marca NO_EJECUTADO, nunca PASS.
+- Puedes coordinar subagentes siguiendo 02_EJECUCION/06_SUBAGENTES.md. Si tu herramienta no permite subagentes, ejecuta roles secuencialmente sin reducir controles.
+- El código debe probarse con unitarias, E2E HTTP y PostgreSQL real DE PRUEBA, incluidos concurrencia, migración legacy, aislamiento, regresión y sin Prospector Service. No utilizar bases ni secretos productivos.
+- Contratos: documenta OpenAPI/Swagger objetivo y observable; no inventes rutas como existentes ni alteres clientes previos silenciosamente. Si hay BREAKING_CHANGE, registra opciones y pide GO antes de publicarlo.
+- Prepara, al terminar el backend, handoff y arnés específico para André conforme a 06_HANDOFF_ANDRE/. El arnés de André debe construirse a partir de la API implementada, no de suposiciones. No ejecutes cambios de Flutter sin permiso.
+- Commit/push normal y PR solo sobre rama de sprint previamente autorizada; NO merge, despliegues, migraciones productivas, force-push, reset/clean destructivo ni cierres de PR previos.
+
+ENTREGA INICIAL (si G0 pendiente): estado y comparación de refs sin editar archivos del repo, discrepancias, decisión pendiente del owner, plan concreto de G1. ENTREGA FINAL (si G0 aprobado y trabajo ejecutado): resumen del SHA exacto, AC, pruebas, migración ensayada, contrato real, riesgos, evidencia, PR sin merge y arnés André generado y marcado LISTO_PARA_REVISION (no aprobado automáticamente).
