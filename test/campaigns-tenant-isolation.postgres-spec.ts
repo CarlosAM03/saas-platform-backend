@@ -478,6 +478,89 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
     expect(body<{ data: unknown[] }>(provenance).data.length).toBeGreaterThan(0);
+  });
+
+  it('T16 preserves responsibility history when a user loses eligibility', async () => {
+    await http()
+      .put(`${base(campaigns[0], prospects[0])}/responsible`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ responsibleId: users[2] })
+      .expect(200);
+    await db.user.update({
+      where: { id: users[2] },
+      data: { status: 'INACTIVO' },
+    });
+
+    const participation = await db.campaignProspect.findUniqueOrThrow({
+      where: {
+        campaignId_prospectId: {
+          campaignId: campaigns[0],
+          prospectId: prospects[0],
+        },
+      },
+    });
+    expect(participation.responsibleId).toBe(users[2]);
+
+    const eligible = await http()
+      .get(`${base(campaigns[0], prospects[0])}/responsibles`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(JSON.stringify(eligible.body)).not.toContain(users[2]);
+
+    const dashboard = await http()
+      .get(`/api/v1/campaigns/${campaigns[0]}/dashboard`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(JSON.stringify(dashboard.body)).toContain(`NO_ELEGIBLE:${users[2]}`);
+  });
+
+  it('T18-T20 JOIN, empty dashboard and legacy-only dashboard remain isolated', async () => {
+    for (const content of ['First synthetic activity', 'Second synthetic activity']) {
+      await http()
+        .post(`${base(campaigns[0], prospects[0])}/activities`)
+        .set('Authorization', `Bearer ${ownerA}`)
+        .send({ type: 'NOTE', content })
+        .expect(201);
+    }
+    const listed = await http()
+      .get(`/api/v1/campaigns/${campaigns[0]}/prospects`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ id: string }[]>(listed).data.filter((item) => item.id === prospects[0])).toHaveLength(1);
+
+    const empty = await db.campaign.create({
+      data: {
+        tenantId: tenants[0],
+        createdBy: users[0],
+        name: 'Empty synthetic campaign',
+      },
+    });
+    campaigns.push(empty.id);
+    const emptyDashboard = await http()
+      .get(`/api/v1/campaigns/${empty.id}/dashboard`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ total: number }>(emptyDashboard).data.total).toBe(0);
+
+    const legacy = await db.prospect.create({
+      data: {
+        tenantId: tenants[0],
+        campaignId: empty.id,
+        name: 'Legacy without provenance',
+        source: 'legacy',
+      },
+    });
+    await db.campaignProspect.create({
+      data: { campaignId: empty.id, prospectId: legacy.id },
+    });
+    const legacyDashboard = await http()
+      .get(`/api/v1/campaigns/${empty.id}/dashboard`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    expect(body<{ total: number; incorporation: Record<string, number> }>(legacyDashboard).data).toMatchObject({
+      total: 1,
+      incorporation: { unknownLegacy: 1 },
+    });
     expect(
       await db.campaignActivity.count({ where: { tenantId: tenants[1] } }),
     ).toBe(1);

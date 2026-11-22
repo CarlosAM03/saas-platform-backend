@@ -181,4 +181,93 @@ describe('CP identity with disposable PostgreSQL', () => {
       1,
     );
   });
+
+  it('T03/T05 weak names require explicit resolution and CREATE preserves the existing candidate', async () => {
+    const service = new ProspectsService(db, context);
+    const existing = await run(tenants[0], () =>
+      service.create({
+        campaignId: campaigns[0],
+        name: 'Empresa Demo',
+      }),
+    );
+    expect(existing.id).toBeDefined();
+
+    const match = await run(tenants[0], () =>
+      service.match({
+        campaignId: campaigns[0],
+        name: ' EMPRESA   DEMO ',
+      }),
+    );
+    expect(match.strongProspect).toBeNull();
+    expect(match.candidates.map((candidate) => candidate.id)).toEqual([
+      existing.id,
+    ]);
+
+    await run(tenants[0], () =>
+      expect(
+        service.create({
+          campaignId: campaigns[0],
+          name: 'EMPRESA DEMO',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException),
+    );
+
+    const resolved = await run(tenants[0], () =>
+      service.resolve({
+        campaignId: campaigns[1],
+        name: 'EMPRESA DEMO',
+        resolution: 'CREATE',
+      }),
+    );
+    expect(resolved.action).toBe('CREATE');
+    expect(
+      await db.prospect.count({ where: { tenantId: tenants[0] } }),
+    ).toBe(2);
+    expect(await db.prospect.findUnique({ where: { id: existing.id } })).not.toBeNull();
+  });
+
+  it('T08 LINK_EXISTING to an existing relation does not restart or duplicate participation', async () => {
+    const service = new ProspectsService(db, context);
+    const prospect = await run(tenants[0], () =>
+      service.create({
+        campaignId: campaigns[0],
+        name: 'Empresa Demo',
+      }),
+    );
+    const before = await db.campaignProspect.findUniqueOrThrow({
+      where: {
+        campaignId_prospectId: {
+          campaignId: campaigns[0],
+          prospectId: prospect.id,
+        },
+      },
+    });
+
+    const resolved = await run(tenants[0], () =>
+      service.resolve({
+        campaignId: campaigns[0],
+        name: 'EMPRESA DEMO',
+        resolution: 'LINK_EXISTING',
+        candidateId: prospect.id,
+      }),
+    );
+    expect(resolved.action).toBe('LINK_EXISTING');
+
+    const after = await db.campaignProspect.findUniqueOrThrow({
+      where: {
+        campaignId_prospectId: {
+          campaignId: campaigns[0],
+          prospectId: prospect.id,
+        },
+      },
+    });
+    expect(after.addedAt).toEqual(before.addedAt);
+    expect(after.commercialStage).toBe(before.commercialStage);
+    expect(after.evaluation).toBe(before.evaluation);
+    expect(
+      await db.campaignProspect.count({
+        where: { campaignId: campaigns[0], prospectId: prospect.id },
+      }),
+    ).toBe(1);
+  });
 });
