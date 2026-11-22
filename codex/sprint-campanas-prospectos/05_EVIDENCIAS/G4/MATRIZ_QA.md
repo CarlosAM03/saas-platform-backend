@@ -2,6 +2,19 @@
 
 **ESTADO: EJECUCIÓN PARCIAL — G4 NO CERRADO**
 
+## Resultado final de regresión — 2026-11-22
+
+HEAD probado: `71ef72d95537b12713dc81bb91b6abd03018df1c`. Build PASS, unitarias 114/114, E2E 84/84 y PostgreSQL 98/98.
+
+| ID | Comando | Resultado | Limitación |
+|---|---|---|---|
+| BUILD-71EF | `npm run build` | PASS código 0 | no acredita AC funcionales |
+| UNIT-71EF | `npm run test:unit:ci` | 11 suites, 114/114 PASS | incluye parser CSV de 5 MB/1000 filas |
+| HTTP-71EF | `npm run test:e2e:ci` | 7 suites, 84/84 PASS | regresión HTTP sintética |
+| PG-71EF | `docker compose --profile test run --build --rm test-postgres` | 11 suites, 98/98 PASS | PG desechable; no acredita TTL 15 min ni revisión independiente |
+
+Casos ejecutados por primera vez sobre este bloque: T01, T03, T05, T08, T16, T18 y T20. T25 permanece PARCIAL porque no se midió el TTL completo de 15 minutos. T32 permanece NOT_RUN fuera del backend. G4 no se declara cerrado hasta revisión independiente y medición de rendimiento.
+
 ## Resultado actual — 2026-11-22
 
 HEAD probado: `d262f48e9ab6b344c472df60588c2261d377c884`. Fecha: `2026-11-22T14:19:54-08:00`. Rama: `feat/sprint-campana-prospector`.
