@@ -136,4 +136,61 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
       ).toBe(0);
     });
   });
+  it('T04/P4 rejects multiple candidates without changing any persisted row', async () => {
+    await prisma.prospect.createMany({
+      data: ['Empresa Demo', ' empresa   demo '].map((name) => ({
+        tenantId,
+        campaignId,
+        name,
+        source: 'manual',
+      })),
+    });
+    const snapshot = async () => ({
+      prospects: await prisma.prospect.findMany({
+        where: { tenantId },
+        orderBy: { id: 'asc' },
+      }),
+      participations: await prisma.campaignProspect.findMany({
+        where: { campaignId },
+      }),
+      activities: await prisma.campaignActivity.findMany({
+        where: { tenantId },
+      }),
+      provenance: await prisma.prospectProvenance.findMany({
+        where: { tenantId },
+      }),
+    });
+    const before = await snapshot();
+    await run(async () => {
+      const csv = Buffer.from('name\nEmpresa Demo');
+      const preview = await service.preview(campaignId, csv);
+      expect(preview.rows[0].classification).toBe('CONFLICT');
+      expect(preview.rows[0].matches).toHaveLength(2);
+      expect(await snapshot()).toEqual(before);
+      const result = await service.confirm(
+        campaignId,
+        csv,
+        preview.previewReference,
+        '[]',
+      );
+      expect(result.rows[0]).toMatchObject({ record: 1, action: 'REJECTED' });
+      expect(result.rows[0].errors?.length).toBeGreaterThan(0);
+      expect(await snapshot()).toEqual(before);
+      await expect(
+        service.confirm(
+          campaignId,
+          csv,
+          preview.previewReference,
+          JSON.stringify([
+            {
+              record: 1,
+              action: 'LINK_EXISTING',
+              candidateId: before.prospects[0].id,
+            },
+          ]),
+        ),
+      ).rejects.toThrow();
+      expect(await snapshot()).toEqual(before);
+    });
+  });
 });

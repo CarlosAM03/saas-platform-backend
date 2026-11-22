@@ -258,11 +258,7 @@ export class CampaignsService {
     return participation;
   }
 
-  async updateStage(
-    campaignId: string,
-    prospectId: string,
-    stage: string,
-  ) {
+  async updateStage(campaignId: string, prospectId: string, stage: string) {
     const nextStage = stage as CommercialStage;
     const tenantId = this.context.requireTenantId();
     const actorUserId = this.context.getRequiredContext().userId;
@@ -483,7 +479,7 @@ export class CampaignsService {
       }
     }
     return this.prisma.$transaction(async (tx) => {
-      await tx.campaignProspect.findFirstOrThrow({
+      const participation = await tx.campaignProspect.findFirst({
         where: {
           campaignId,
           prospectId,
@@ -491,6 +487,8 @@ export class CampaignsService {
           prospect: { tenantId },
         },
       });
+      if (!participation)
+        throw new NotFoundException('Participation not found');
       if (request.correctsId) {
         const original = await tx.campaignActivity.findFirst({
           where: {
@@ -502,9 +500,9 @@ export class CampaignsService {
         });
         if (!original) throw new NotFoundException('Activity not found');
       }
-      const type = (request.correctsId
-        ? CampaignActivityType.CORRECTION
-        : request.type) as CampaignActivityType;
+      const type = (
+        request.correctsId ? CampaignActivityType.CORRECTION : request.type
+      ) as CampaignActivityType;
       return tx.campaignActivity.create({
         data: {
           tenantId,
