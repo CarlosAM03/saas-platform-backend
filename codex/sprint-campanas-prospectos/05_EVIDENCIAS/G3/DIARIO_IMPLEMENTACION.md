@@ -4,7 +4,7 @@
 
 | Fecha | SHA | Feature(s) | Código/contrato/migración | Prueba incremental | Resultado observado | Restricción / próximo paso |
 |---|---|---|---|---|---|---|
-| 2026-11-21 | `PENDIENTE_COMMIT_G3` | C1/C2/C3/C4/C6/C8/P1/P2/P3/P4 | Prisma, migración aditiva, servicios y rutas del dominio | `npm run prisma:generate`; `npm run build` | PASS compilación | Ejecutar G4 unit/E2E/PG y publicar Swagger real |
+| 2026-11-21 | `810723b1314ef04abbb1812b7ddde91a7f6f546` | C1/C2/C3/C4/C6/C8/P1/P2/P3/P4 | Prisma, migración aditiva, servicios y rutas del dominio | `npm run prisma:generate`; `npm run build` | PASS compilación | Ejecutar G4 unit/E2E/PG y publicar Swagger real |
 
 No documentar PASS basándose únicamente en intención o mocks.
 

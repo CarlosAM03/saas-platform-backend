@@ -2,7 +2,7 @@
 
 **ESTADO: EJECUCIÓN PARCIAL — G4 NO CERRADO**
 
-- Backend HEAD exacto: `f09fbee77e26b9b0cdfa3581883b87209b75e`, validado el 2026-11-21
+- Backend HEAD exacto: `f09fbee77e26b9b0cdfa3581883b87218e7a8f7d`, validado el 2026-11-21
 - PostgreSQL sintético y tipo de dataset: Docker Compose profile test, PostgreSQL 16 desechable
 - Comandos/fecha/log (saneado): `npm run build`, `npm run test:unit:ci`, `npm run test:e2e:ci`, `docker compose --profile test run --build --rm test-postgres`
 - Unitarias (observado): 113/113 PASS
@@ -21,11 +21,11 @@
 
 | Test | SHA | Comando / fixture | Resultado | Evidencia | Limitación |
 |---|---|---|---|---|---|
-| Build/Prisma | f09fbee77e26b9b0cdfa3581883b87209b75e | `npm run prisma:generate`; `npm run build` | PASS | salida del shell | generación/compilación |
-| Unitarias | f09fbee77e26b9b0cdfa3581883b87209b75e | `npm run test:unit:ci` | 113/113 PASS | suites Jest | no cubre todos los AC sprint |
-| E2E HTTP | f09fbee77e26b9b0cdfa3581883b87209b75e | `npm run test:e2e:ci` | 84/84 PASS | suites Jest HTTP | no prueba todos los endpoints nuevos |
-| PostgreSQL 16 | f09fbee77e26b9b0cdfa3581883b87209b75e | `docker compose --profile test run --build --rm test-postgres` | 59/59 PASS | suites PostgreSQL desechables | migración aplicada; T28 específico pendiente |
-| T25–P4 CSV | f09fbee77e26b9b0cdfa3581883b87209b75e | suites existentes CSV E2E/PostgreSQL | PARCIAL PASS | pruebas CSV existentes | límites/múltiples candidatos no completos |
-| T28 | f09fbee77e26b9b0cdfa3581883b87209b75e | migración aplicación PostgreSQL | NO_EJECUTADO ESPECÍFICO | — | solo aplicación DDL demostrada |
-| T30 | f09fbee77e26b9b0cdfa3581883b87209b75e | `without-prospector.e2e-spec.ts` | PASS | suite E2E | módulos externos intactos |
-| T32 | f09fbee77e26b9b0cdfa3581883b87209b75e | — | NO_EJECUTADO | — | Flutter fuera de backend |
+| Build/Prisma | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | `npm run prisma:generate`; `npm run build` | PASS | salida del shell | generación/compilación |
+| Unitarias | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | `npm run test:unit:ci` | 113/113 PASS | suites Jest | no cubre todos los AC sprint |
+| E2E HTTP | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | `npm run test:e2e:ci` | 84/84 PASS | suites Jest HTTP | no prueba todos los endpoints nuevos |
+| PostgreSQL 16 | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | `docker compose --profile test run --build --rm test-postgres` | 59/59 PASS | suites PostgreSQL desechables | migración aplicada; T28 específico pendiente |
+| T25–P4 CSV | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | suites existentes CSV E2E/PostgreSQL | PARCIAL PASS | pruebas CSV existentes | límites/múltiples candidatos no completos |
+| T28 | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | migración aplicación PostgreSQL | NO_EJECUTADO ESPECÍFICO | — | solo aplicación DDL demostrada |
+| T30 | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | `without-prospector.e2e-spec.ts` | PASS | suite E2E | módulos externos intactos |
+| T32 | f09fbee77e26b9b0cdfa3581883b87218e7a8f7d | — | NO_EJECUTADO | — | Flutter fuera de backend |
