@@ -155,6 +155,26 @@ describe('ProspectImportsService', () => {
       expect.objectContaining({ where: { tenantId: 'tenant' } }),
     );
   });
+  it('T25 rejects a preview reference after the 15-minute TTL', async () => {
+    await run(async () => {
+      const now = jest.spyOn(Date, 'now');
+      now.mockReturnValue(1_700_000_000_000);
+      const preview = await service.preview('campaign', file);
+      expect(preview.expiresAt).toBe(
+        new Date(1_700_000_000_000 + 15 * 60 * 1000).toISOString(),
+      );
+      now.mockReturnValue(1_700_000_000_000 + 15 * 60 * 1000);
+      await expect(
+        service.confirm(
+          'campaign',
+          file,
+          preview.previewReference,
+          '[{"record":1,"action":"CREATE"},{"record":2,"action":"CREATE"}]',
+        ),
+      ).rejects.toThrow('expired preview reference');
+      now.mockRestore();
+    });
+  });
   it('validates all decisions before writing', async () => {
     await run(async () => {
       const preview = await service.preview('campaign', file);
