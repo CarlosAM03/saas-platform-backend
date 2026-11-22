@@ -18,17 +18,17 @@ const operations = (doc: OpenAPIObject) =>
   );
 
 describe('ADR006 controlled contract composition', () => {
-  it('preserves all 33 core operations and login shape; adds exactly five unique operations', () => {
+it('preserves all 45 core operations and login shape; adds exactly five unique operations', () => {
     const core = baseline();
     const before = structuredClone(core);
     addTenantRegistration(core, true);
-    expect(operations(before)).toHaveLength(33);
-    expect(operations(core)).toHaveLength(38);
+    expect(operations(before)).toHaveLength(45);
+    expect(operations(core)).toHaveLength(50);
     for (const { path, method, operation } of operations(before))
       expect(core.paths[path][method]).toEqual(operation);
     expect(
       new Set(operations(core).map((o) => o.operation.operationId)).size,
-    ).toBe(38);
+    ).toBe(50);
     expect(core.paths['/api/v1/auth/login'].post?.responses['200']).toEqual(
       before.paths['/api/v1/auth/login'].post?.responses['200'],
     );
