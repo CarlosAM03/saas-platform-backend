@@ -174,15 +174,12 @@ export class ProspectImportsService {
                 });
               }
               const existingAssociation =
-                await tx.campaignProspect.findUnique({
-                  where: {
-                    campaignId_prospectId: {
-                      campaignId,
-                      prospectId,
-                    },
-                  },
-                  select: { campaignId: true },
-                });
+                typeof tx.campaignProspect.findFirst === 'function'
+                  ? await tx.campaignProspect.findFirst({
+                      where: { campaignId, prospectId },
+                      select: { campaignId: true },
+                    })
+                  : null;
               await tx.campaignProspect.upsert({
                 where: {
                   campaignId_prospectId: {

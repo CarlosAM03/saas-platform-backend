@@ -17,7 +17,12 @@ describe('ProspectImportsService', () => {
   let tx: {
     campaign: { findFirst: jest.Mock };
     prospect: { findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
-    campaignProspect: { upsert: jest.Mock };
+    campaignProspect: {
+      upsert: jest.Mock;
+      findFirst: jest.Mock;
+    };
+    prospectProvenance: { create: jest.Mock };
+    campaignActivity: { create: jest.Mock };
   };
   let transaction: jest.Mock;
   let service: ProspectImportsService;
@@ -49,7 +54,12 @@ describe('ProspectImportsService', () => {
         create: jest.fn().mockResolvedValue({ id: 'new' }),
         update: jest.fn().mockResolvedValue({}),
       },
-      campaignProspect: { upsert: jest.fn().mockResolvedValue({}) },
+      campaignProspect: {
+        upsert: jest.fn().mockResolvedValue({}),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      prospectProvenance: { create: jest.fn().mockResolvedValue({}) },
+      campaignActivity: { create: jest.fn().mockResolvedValue({}) },
     };
     transaction = jest
       .fn()

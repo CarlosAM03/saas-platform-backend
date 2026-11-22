@@ -97,7 +97,7 @@ ON CONFLICT ("campaign_id", "prospect_id") DO NOTHING;
 
 CREATE TABLE "campaign_activities" (
   "id" TEXT NOT NULL,
-  "tenant_id" TEXT NOT NOT NULL,
+  "tenant_id" TEXT NOT NULL,
   "campaign_id" TEXT NOT NULL,
   "prospect_id" TEXT NOT NULL,
   "type" "CampaignActivityType" NOT NULL,

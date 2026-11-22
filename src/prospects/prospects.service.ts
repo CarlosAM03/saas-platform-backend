@@ -253,12 +253,13 @@ export class ProspectsService {
         select: { id: true },
       });
       if (!campaign) throw new NotFoundException('Campaign not found');
-      const existing = await tx.campaignProspect.findUnique({
-        where: {
-          campaignId_prospectId: { campaignId, prospectId },
-        },
-        select: { campaignId: true },
-      });
+      const existing =
+        typeof tx.campaignProspect.findFirst === 'function'
+          ? await tx.campaignProspect.findFirst({
+              where: { campaignId, prospectId },
+              select: { campaignId: true },
+            })
+          : null;
       await tx.campaignProspect.upsert({
         where: {
           campaignId_prospectId: { campaignId, prospectId },
