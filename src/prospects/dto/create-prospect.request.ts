@@ -53,4 +53,13 @@ export class CreateProspectRequest {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown> | null;
+
+  @IsOptional()
+  @IsIn(['google_maps'])
+  identitySource?: 'google_maps';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/, { message: 'identityIdentifier no puede estar vacío' })
+  identityIdentifier?: string;
 }

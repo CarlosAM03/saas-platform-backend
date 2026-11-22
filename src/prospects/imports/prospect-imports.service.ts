@@ -173,6 +173,16 @@ export class ProspectImportsService {
                   data: row.values,
                 });
               }
+              const existingAssociation =
+                await tx.campaignProspect.findUnique({
+                  where: {
+                    campaignId_prospectId: {
+                      campaignId,
+                      prospectId,
+                    },
+                  },
+                  select: { campaignId: true },
+                });
               await tx.campaignProspect.upsert({
                 where: {
                   campaignId_prospectId: {
@@ -183,6 +193,77 @@ export class ProspectImportsService {
                 create: { campaignId, prospectId: prospectId },
                 update: {},
               });
+              if (action === 'CREATE') {
+                await tx.prospectProvenance.create({
+                  data: {
+                    tenantId,
+                    prospectId,
+                    campaignId,
+                    type: 'CREATED',
+                    source: 'csv',
+                    actorUserId:
+                      this.context.getRequiredContext().userId,
+                  },
+                });
+                await tx.campaignActivity.create({
+                  data: {
+                    tenantId,
+                    campaignId,
+                    prospectId,
+                    type: 'ASSOCIATION',
+                    actorUserId:
+                      this.context.getRequiredContext().userId,
+                  },
+                });
+              } else if (action === 'LINK_EXISTING') {
+                await tx.prospectProvenance.create({
+                  data: {
+                    tenantId,
+                    prospectId,
+                    campaignId,
+                    type: existingAssociation ? 'REAPPEARED' : 'LINKED',
+                    source: 'csv',
+                    actorUserId:
+                      this.context.getRequiredContext().userId,
+                  },
+                });
+                if (!existingAssociation) {
+                  await tx.campaignActivity.create({
+                    data: {
+                      tenantId,
+                      campaignId,
+                      prospectId,
+                      type: 'ASSOCIATION',
+                      actorUserId:
+                        this.context.getRequiredContext().userId,
+                    },
+                  });
+                }
+              } else if (action === 'UPDATE_EXISTING') {
+                await tx.prospectProvenance.create({
+                  data: {
+                    tenantId,
+                    prospectId,
+                    campaignId,
+                    type: 'MASTER_UPDATED',
+                    source: 'csv',
+                    actorUserId:
+                      this.context.getRequiredContext().userId,
+                  },
+                });
+                if (!existingAssociation) {
+                  await tx.campaignActivity.create({
+                    data: {
+                      tenantId,
+                      campaignId,
+                      prospectId,
+                      type: 'ASSOCIATION',
+                      actorUserId:
+                        this.context.getRequiredContext().userId,
+                    },
+                  });
+                }
+              }
               result.push({ record: row.record, action, prospectId });
             }
             return {
