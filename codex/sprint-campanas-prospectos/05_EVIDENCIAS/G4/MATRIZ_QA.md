@@ -2,6 +2,12 @@
 
 **ESTADO: EJECUCIÓN PARCIAL — G4 NO CERRADO**
 
+## Resultado más reciente — 2026-11-22
+
+HEAD probado: `cd7227def8eee323cff3df666c25610486ceeb04`. Build PASS, unitarias 113/113, E2E 84/84 y PostgreSQL 93/93 (antes 61). Se implementaron casos específicos de concurrencia fuerte T07, rechazo seguro CSV T04, legacy T28 e IDs cruzados T31, con cobertura y límites por caso en [RESULTADOS_CD7227D.md](RESULTADOS_CD7227D.md). Se corrigió el 500 de creación de actividad con participación ajena para devolver 404, sin cambios protegidos. G4 permanece abierto por cobertura completa de AC/T01–T31, revisión independiente y mediciones pendientes; T32 sigue reservado al frontend.
+
+## Registros históricos (cada resultado conserva su SHA)
+
 - Backend HEAD exacto: `f09fbee77e26b9b0cdfa3581883b87218e7a8f7d`, validado el 2026-11-21
 - PostgreSQL sintético y tipo de dataset: Docker Compose profile test, PostgreSQL 16 desechable
 - Comandos/fecha/log (saneado): `npm run build`, `npm run test:unit:ci`, `npm run test:e2e:ci`, `docker compose --profile test run --build --rm test-postgres`
