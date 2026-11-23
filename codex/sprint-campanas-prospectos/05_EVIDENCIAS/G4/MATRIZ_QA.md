@@ -4,6 +4,8 @@
 
 ## Ejecución vigente — pruebas de cobertura AC y sensibilidad de instantánea (2026-11-23)
 
+Cierre de parciales y verificación post-commit: además del bloque inicial, se añadieron pruebas para `AC-C2-01`, `AC-C4-02` y `AC-C8-04`. La cadena completa se ejecutó de nuevo sobre el árbol de trabajo consolidado y dio build PASS, 177 unitarias, 84 HTTP y **184 PostgreSQL** — **445 pruebas** en 34 suites, 4 migraciones sin pendientes. Antes, la misma cadena sobre el commit documental `d42be1c27be192f0bca8ab36aabaacedc1c00518` dio 181 PostgreSQL (442 pruebas). Contraste por AC: **37 `CUBIERTO` · 13 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`** en `MATRIZ_COBERTURA_AC.md`.
+
 HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` **+ worktree modificado** en `test/campaigns-read-capabilities.postgres-spec.ts` y `test/prospect-read-capabilities.postgres-spec.ts`. Detalle completo en `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`; conclusión para el owner en `CONCLUSION_G4_7A63DFB.md`.
 
 | ID | Gate | Fecha | HEAD | Comando | Dataset | Esperado | Observado | Estado | Evidencia |
@@ -11,11 +13,11 @@ HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` **+ worktree modifica
 | BUILD-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run build` | árbol del HEAD | compila | código 0 | PASS | `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md` |
 | UNIT-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run test:unit:ci` | fixtures unitarios sintéticos | verde | 12 suites, 177/177 | PASS | mismo documento |
 | HTTP-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run test:e2e:ci` | dobles HTTP en memoria | verde | 7 suites, 84/84 | PASS | mismo documento |
-| PG-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run test:postgres` (PG16 desechable) | fixtures sintéticos; 4 migraciones sin pendientes | verde | 15 suites, 181/181 | PASS | mismo documento |
+| PG-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run test:postgres` (PG16 desechable) | fixtures sintéticos; 4 migraciones sin pendientes | verde | 15 suites, 184/184 | PASS | mismo documento |
 | SNAP-RED | G4 | 2026-11-23 | `7a63dfb` + worktree con `dashboard` secuencial temporal | `npm run test:postgres -- --testPathPatterns=campaigns-read-capabilities -t 'keeps one snapshot'` | 2 participaciones + 1 escritura intercalada | la prueba falla | `Expected: 2`, `Received: 3` en `activity.events` | PASS de sensibilidad | mismo documento |
 | LINT-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npx eslint`; `npx prettier --check` | dos archivos de prueba modificados | código 0 | código 0 | PASS | mismo documento |
 
-Total funcional vigente: **442 pruebas** (177 + 84 + 181) en 34 suites; las 4 de rendimiento quedan fuera. Los AC quedaron en 34 `CUBIERTO` · 16 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO` según `MATRIZ_COBERTURA_AC.md`.
+Total funcional vigente: **445 pruebas** (177 + 84 + 184) en 34 suites; las 4 de rendimiento quedan fuera. Los AC quedaron en 37 `CUBIERTO` · 13 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO` según `MATRIZ_COBERTURA_AC.md`.
 
 Aclaración de atribución: estos resultados corresponden al **HEAD más el worktree de pruebas**, no a un commit nuevo. La sensibilidad de la prueba del dashboard quedó demostrada; antes de este bloque la aserción `events >= total` habría aceptado una lectura mixta.
 

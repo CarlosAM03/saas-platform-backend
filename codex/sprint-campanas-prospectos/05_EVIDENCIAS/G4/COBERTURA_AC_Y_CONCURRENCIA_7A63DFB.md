@@ -18,7 +18,8 @@ Además, lanzar 20 lectores y 20 escritores de forma simultánea no garantiza qu
 |---|---|---|
 | `test/campaigns-read-capabilities.postgres-spec.ts` | Aserciones exactas (`sum(stages)`, `sum(evaluations)`, `sum(responsibility)`, suma de `incorporation`, `activity.manual === 0`, `activity.events === total`, `activity.total === total`) en el caso concurrente de 20/20. | Eliminar la cota inferior insensible al defecto. |
 | mismo archivo | Nueva prueba determinista: `keeps one snapshot when a writer commits between the two activity counts`, con proxy sobre `PrismaService` que detiene el primer conteo de actividad hasta que una escritura externa confirma, y libera después. | Forzar el intercalado; una lectura secuencial debe mezclar instantes y una transacción `RepeatableRead` debe mantener una sola instantánea. |
-| mismo archivo | `AC-C2-02`, `AC-C4-03`, `AC-C8-01`, `AC-C3-04`: cuatro pruebas nuevas de criterios sin cobertura. | Cerrar huecos detectados en la matriz de contraste. |
+| `test/campaigns-read-capabilities.postgres-spec.ts` | `AC-C2-02`, `AC-C4-03`, `AC-C8-01`, `AC-C3-04`: cuatro pruebas nuevas de criterios sin cobertura. | Cerrar huecos detectados en la matriz de contraste. |
+| mismo archivo | `AC-C2-01`, `AC-C4-02`, `AC-C8-04`: snapshot sin mutación tras el rechazo, rechazo por inactividad/sin membresía y dashboard vacío sin `NaN`. | Cerrar parciales con aserciones solo indirectas. |
 | `test/prospect-read-capabilities.postgres-spec.ts` | `AC-P2-02`: mutar etapa y evaluación en B y comparar el resumen de A antes/después. | Cerrar el hueco de C7/P2. |
 
 No se agregaron dependencias, utilidades compartidas ni cambios de producción.
@@ -47,16 +48,20 @@ npm run build && npm run test:unit:ci && npm run test:e2e:ci && npm run prisma:m
 | UNIT-CP-AC | G4 | `npm run test:unit:ci` | fixtures unitarios sintéticos | verde | 12 suites, 177/177 | PASS |
 | HTTP-CP-AC | G4 | `npm run test:e2e:ci` | HTTP con dobles en memoria | verde | 7 suites, 84/84 | PASS |
 | MIG-CP-AC | G4 | `npm run prisma:migrate:deploy` | PG16 desechable | sin pendientes | 4 migraciones, ninguna pendiente | PASS |
-| PG-CP-AC | G4 | `npm run test:postgres` | PG16 desechable, fixtures sintéticos | verde | 15 suites, 181/181 | PASS |
+| PG-CP-AC | G4 | `npm run test:postgres` | PG16 desechable, fixtures sintéticos | verde | 15 suites, 184/184 | PASS |
 | LINT-CP-AC | G4 | `npx eslint` y `npx prettier --check` sobre los dos archivos de prueba modificados | — | código 0 | ambos código 0 | PASS |
 
-Total funcional del bloque: **442 pruebas** (177 + 84 + 181) en 34 suites. Las 4 pruebas de rendimiento no se incluyen ni se repitieron en este bloque.
+Total funcional del bloque: **445 pruebas** (177 + 84 + 184) en 34 suites. Las 4 pruebas de rendimiento no se incluyen ni se repitieron en este bloque.
 
 ## 5. Efecto sobre la matriz de contraste
 
-`MATRIZ_COBERTURA_AC.md` pasa de 29 `CUBIERTO` / 16 `CUBIERTO_PARCIAL` / 5 `NO_CUBIERTO` a **34 `CUBIERTO` / 16 `CUBIERTO_PARCIAL` / 0 `NO_CUBIERTO`**. Los cinco criterios cerrados son `AC-C2-02`, `AC-C3-04`, `AC-C4-03`, `AC-C8-01` y `AC-P2-02`.
+`MATRIZ_COBERTURA_AC.md` pasa de 29 `CUBIERTO` / 16 `CUBIERTO_PARCIAL` / 5 `NO_CUBIERTO` a **37 `CUBIERTO` / 13 `CUBIERTO_PARCIAL` / 0 `NO_CUBIERTO`**. Los ocho criterios cerrados son `AC-C2-02`, `AC-C3-04`, `AC-C4-03`, `AC-C8-01` y `AC-P2-02` (huecos) más `AC-C2-01`, `AC-C4-02` y `AC-C8-04` (parciales con aserciones solo indirectas).
 
-Los 16 criterios parciales conservan su brecha declarada; destacan por impacto: `AC-C4-01` y `AC-C4-02` (caminos positivos y rechazos por rol/inactividad), `AC-C8-04` (explicitación de ausencia de `NaN`), `AC-P4-03` (aviso de efecto global de `UPDATE_EXISTING`) y `AC-P4-07` (resultados por fila de vinculado/omitido).
+Los 13 criterios parciales conservan su brecha declarada; destacan por impacto: `AC-C4-01` (caminos positivos con `MEMBER`/`ADMIN`), `AC-C8-04` se cerró pero `AC-P4-03` (aviso de efecto global de `UPDATE_EXISTING`) y `AC-P4-07` (resultados por fila de vinculado/omitido) siguen abiertos en su parte de contrato.
+
+### Verificación posterior al commit
+
+Tras crear los commits `a5055b5` (pruebas) y `d42be1c` (documentación), se repitió la cadena completa sobre el árbol consolidado en `d42be1c27be192f0bca8ab36aabaacedc1c00518`: build código 0, 177 unitarias, 84 HTTP, 181 PostgreSQL y 4 migraciones sin pendientes. Posteriormente se añadieron las tres pruebas de parciales y se ejecutó la cadena final: build código 0, 177 unitarias, 84 HTTP, **184 PostgreSQL**, total **445**. Las cifras de la tabla anterior corresponden a esa última corrida.
 
 ## 6. Limitaciones y riesgos residuales
 

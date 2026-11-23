@@ -4,7 +4,7 @@
 
 ## Cierre del bloque de cobertura — 2026-11-23
 
-HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Se añadieron cinco pruebas de AC (`AC-C2-02`, `AC-C3-04`, `AC-C4-03`, `AC-C8-01`, `AC-P2-02`) y se reforzó la prueba de instantánea del dashboard con aserciones exactas y un intercalado determinista. Regresión: build PASS, 177 unitarias, 84 HTTP, 181 PostgreSQL (442 en total) sobre PG16 desechable. Sin cambios en `src/`, `Prisma/`, migraciones ni módulos protegidos. Evidencia: `../G4/COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`. G4 sigue sin cerrar; la aceptación es del owner.
+HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Se añadieron ocho pruebas de AC (`AC-C2-01`, `AC-C2-02`, `AC-C3-04`, `AC-C4-02`, `AC-C4-03`, `AC-C8-01`, `AC-C8-04`, `AC-P2-02`) y se reforzó la prueba de instantánea del dashboard con aserciones exactas y un intercalado determinista. Regresión: build PASS, 177 unitarias, 84 HTTP, 184 PostgreSQL (445 en total) sobre PG16 desechable. Sin cambios en `src/`, `Prisma/`, migraciones ni módulos protegidos. Evidencia: `../G4/COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`. G4 sigue sin cerrar; la aceptación es del owner.
 
 ## Sincronización de seguimiento — 2026-11-22
 

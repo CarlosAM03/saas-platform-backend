@@ -4,7 +4,7 @@
 
 ## Sincronización — 2026-11-23
 
-HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas y documentación. La conclusión técnica de G4 está emitida en `../G4/CONCLUSION_G4_7A63DFB.md` con tres preguntas concretas para el owner (aceptar G4 con 16 AC parciales, priorizar brechas antes de G5, autorizar el commit del bloque). Cobertura por AC en `../G4/MATRIZ_COBERTURA_AC.md`. Este seguimiento no constituye revisión ni aceptación; no hubo push, merge, deploy ni PR. T32 sigue `NOT_RUN` y corresponde al frontend.
+HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas y documentación. La conclusión técnica de G4 está emitida en `../G4/CONCLUSION_G4_7A63DFB.md` con tres preguntas concretas para el owner (aceptar G4 con 13 AC parciales, priorizar brechas antes de G5, autorizar el commit del bloque). Cobertura por AC en `../G4/MATRIZ_COBERTURA_AC.md`. Este seguimiento no constituye revisión ni aceptación; no hubo push, merge, deploy ni PR. T32 sigue `NOT_RUN` y corresponde al frontend.
 
 ## Sincronización — 2026-11-22
 
