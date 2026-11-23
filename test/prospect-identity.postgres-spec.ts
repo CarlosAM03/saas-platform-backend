@@ -110,7 +110,7 @@ describe('CP identity with disposable PostgreSQL', () => {
               campaignId,
               name: 'Empresa Demo',
               identitySource: 'google_maps',
-              identityIdentifier: i ? ' place-123 ' : 'Place-123',
+              identityIdentifier: i ? ' Place-123 ' : 'Place-123',
             }),
           ),
         ),
@@ -129,7 +129,7 @@ describe('CP identity with disposable PostgreSQL', () => {
       expect(rows[0]).toMatchObject({
         identitySource: 'google_maps',
         identityHash: createHash('sha256')
-          .update('google_maps:place-123')
+          .update('google_maps:Place-123')
           .digest('hex'),
       });
       expect(
@@ -220,10 +220,12 @@ describe('CP identity with disposable PostgreSQL', () => {
       }),
     );
     expect(resolved.action).toBe('CREATE');
+    expect(await db.prospect.count({ where: { tenantId: tenants[0] } })).toBe(
+      2,
+    );
     expect(
-      await db.prospect.count({ where: { tenantId: tenants[0] } }),
-    ).toBe(2);
-    expect(await db.prospect.findUnique({ where: { id: existing.id } })).not.toBeNull();
+      await db.prospect.findUnique({ where: { id: existing.id } }),
+    ).not.toBeNull();
   });
 
   it('T08 LINK_EXISTING to an existing relation does not restart or duplicate participation', async () => {

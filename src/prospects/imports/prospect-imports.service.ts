@@ -125,7 +125,7 @@ export class ProspectImportsService {
               const allowed: Action[] =
                 row.classification === 'NEW'
                   ? ['CREATE', 'SKIP']
-                  : ['LINK_EXISTING', 'UPDATE_EXISTING', 'SKIP'];
+                  : ['CREATE', 'LINK_EXISTING', 'UPDATE_EXISTING', 'SKIP'];
               if (!allowed.includes(action))
                 throw new BadRequestException(
                   `Invalid action for record ${row.record}`,
@@ -198,8 +198,15 @@ export class ProspectImportsService {
                     campaignId,
                     type: 'CREATED',
                     source: 'csv',
-                    actorUserId:
-                      this.context.getRequiredContext().userId,
+                    ...(row.classification === 'MATCH'
+                      ? {
+                          details: {
+                            resolution: 'CREATE',
+                            candidateIds: row.matches.map((match) => match.id),
+                          },
+                        }
+                      : {}),
+                    actorUserId: this.context.getRequiredContext().userId,
                   },
                 });
                 await tx.campaignActivity.create({
@@ -208,8 +215,7 @@ export class ProspectImportsService {
                     campaignId,
                     prospectId,
                     type: 'ASSOCIATION',
-                    actorUserId:
-                      this.context.getRequiredContext().userId,
+                    actorUserId: this.context.getRequiredContext().userId,
                   },
                 });
               } else if (action === 'LINK_EXISTING') {
@@ -220,8 +226,7 @@ export class ProspectImportsService {
                     campaignId,
                     type: existingAssociation ? 'REAPPEARED' : 'LINKED',
                     source: 'csv',
-                    actorUserId:
-                      this.context.getRequiredContext().userId,
+                    actorUserId: this.context.getRequiredContext().userId,
                   },
                 });
                 if (!existingAssociation) {
@@ -231,8 +236,7 @@ export class ProspectImportsService {
                       campaignId,
                       prospectId,
                       type: 'ASSOCIATION',
-                      actorUserId:
-                        this.context.getRequiredContext().userId,
+                      actorUserId: this.context.getRequiredContext().userId,
                     },
                   });
                 }
@@ -244,19 +248,27 @@ export class ProspectImportsService {
                     campaignId,
                     type: 'MASTER_UPDATED',
                     source: 'csv',
-                    actorUserId:
-                      this.context.getRequiredContext().userId,
+                    actorUserId: this.context.getRequiredContext().userId,
                   },
                 });
                 if (!existingAssociation) {
+                  await tx.prospectProvenance.create({
+                    data: {
+                      tenantId,
+                      prospectId,
+                      campaignId,
+                      type: 'LINKED',
+                      source: 'csv',
+                      actorUserId: this.context.getRequiredContext().userId,
+                    },
+                  });
                   await tx.campaignActivity.create({
                     data: {
                       tenantId,
                       campaignId,
                       prospectId,
                       type: 'ASSOCIATION',
-                      actorUserId:
-                        this.context.getRequiredContext().userId,
+                      actorUserId: this.context.getRequiredContext().userId,
                     },
                   });
                 }

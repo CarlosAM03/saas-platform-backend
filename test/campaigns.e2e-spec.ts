@@ -49,14 +49,31 @@ function matches(row: Row, where: Row = {}): boolean {
   });
 }
 
-function selected(row: Row, select?: Record<string, boolean>): Row {
-  return select
-    ? Object.fromEntries(
-        Object.keys(select)
-          .filter((key) => select[key])
-          .map((key) => [key, row[key]]),
-      )
-    : { ...row };
+function selected(row: Row, select?: Record<string, unknown>): Row {
+  if (!select) return { ...row };
+  return Object.fromEntries(
+    Object.entries(select)
+      .filter(([, value]) => Boolean(value))
+      .map(([key, spec]) => {
+        const value = row[key];
+        const nested = spec as {
+          where?: Row;
+          select?: Record<string, unknown>;
+        };
+        if (typeof nested === 'object' && nested !== null && nested.select) {
+          if (Array.isArray(value))
+            return [
+              key,
+              (value as Row[])
+                .filter((item) => matches(item, nested.where))
+                .map((item) => selected(item, nested.select)),
+            ];
+          if (value && typeof value === 'object')
+            return [key, selected(value as Row, nested.select)];
+        }
+        return [key, value];
+      }),
+  );
 }
 
 function page(rows: Row[], args: Args): Row[] {
@@ -257,7 +274,9 @@ describe('Campaigns (e2e)', () => {
         http()
           .put(`/api/v1/campaigns/${a}/prospects/prospect-a/responsible`)
           .send({ responsibleId: 'user-owner' }),
-        http().delete(`/api/v1/campaigns/${a}/prospects/prospect-a/responsible`),
+        http().delete(
+          `/api/v1/campaigns/${a}/prospects/prospect-a/responsible`,
+        ),
         http().get(`/api/v1/campaigns/${a}/prospects/prospect-a/activities`),
         http()
           .post(`/api/v1/campaigns/${a}/prospects/prospect-a/activities`)
@@ -488,7 +507,11 @@ describe('Campaigns (e2e)', () => {
         tenantId: 'tenant-a',
         name: 'Alpha Lead',
         campaignProspects: [
-          { campaignId: a, campaign: { tenantId: 'tenant-a' } },
+          {
+            campaignId: a,
+            campaign: { tenantId: 'tenant-a' },
+            prospect: { tenantId: 'tenant-a' },
+          },
         ],
       },
       {
@@ -497,7 +520,11 @@ describe('Campaigns (e2e)', () => {
         tenantId: 'tenant-a',
         name: 'Beta Lead',
         campaignProspects: [
-          { campaignId: a, campaign: { tenantId: 'tenant-a' } },
+          {
+            campaignId: a,
+            campaign: { tenantId: 'tenant-a' },
+            prospect: { tenantId: 'tenant-a' },
+          },
         ],
       },
       {
@@ -506,7 +533,11 @@ describe('Campaigns (e2e)', () => {
         tenantId: 'tenant-b',
         name: 'Foreign Lead',
         campaignProspects: [
-          { campaignId: a, campaign: { tenantId: 'tenant-a' } },
+          {
+            campaignId: a,
+            campaign: { tenantId: 'tenant-a' },
+            prospect: { tenantId: 'tenant-b' },
+          },
         ],
       },
       {

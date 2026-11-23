@@ -372,6 +372,17 @@ paths:
     get:
       tags: [Campaigns, Prospects]
       summary: Lista prospectos de una campaña
+      description: |
+        ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN.
+        Filtros de dimensiones distintas se combinan con AND. category y address
+        buscan texto contenido sin distinguir mayúsculas; source coincide exactamente.
+        search busca en name o email. UNASSIGNED selecciona responsable nulo.
+        Devuelve campos maestros y participation contextual; status maestro se conserva
+        y no representa la etapa comercial. addedFrom/addedTo filtran addedAt;
+        activityFrom/activityTo exigen alguna actividad de esa participación por recordedAt.
+        Rangos inclusivos, combinados con AND, ISO 8601 con zona Z o ±HH:mm obligatoria.
+        Fecha inválida, sin zona o rango invertido devuelve 400.
+        Orden estable por sortBy/sortOrder y desempate por id ascendente.
       operationId: listCampaignProspects
       security: [{ bearerAuth: [] }]
       parameters:
@@ -379,7 +390,9 @@ paths:
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Limit' }
         - { $ref: '#/components/parameters/Search' }
-        - { $ref: '#/components/parameters/SortBy' }
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [name, email, status, createdAt, updatedAt], default: name }
         - { $ref: '#/components/parameters/SortOrder' }
         - { $ref: '#/components/parameters/CategoryFilter' }
         - { $ref: '#/components/parameters/AddressFilter' }
@@ -387,15 +400,29 @@ paths:
         - { $ref: '#/components/parameters/CommercialStageFilter' }
         - { $ref: '#/components/parameters/CommercialEvaluationFilter' }
         - { $ref: '#/components/parameters/ResponsibleFilter' }
+        - name: addedFrom
+          in: query
+          schema: { $ref: '#/components/schemas/ContextRangeTimestamp' }
+        - name: addedTo
+          in: query
+          schema: { $ref: '#/components/schemas/ContextRangeTimestamp' }
+        - name: activityFrom
+          in: query
+          schema: { $ref: '#/components/schemas/ContextRangeTimestamp' }
+        - name: activityTo
+          in: query
+          schema: { $ref: '#/components/schemas/ContextRangeTimestamp' }
       responses:
-        '200': { $ref: '#/components/responses/ProspectPage' }
+        '200': { $ref: '#/components/responses/CampaignProspectPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/campaigns/{id}/dashboard:
     get:
       tags: [Campaigns]
       summary: Dashboard operativo de una campaña
-      description: Agregados actuales de participaciones de la campaña y tenant seleccionados; no es el dashboard global. responsibility usa SIN_ASIGNAR o NO_ELEGIBLE:{userId} cuando corresponde.
+      description: 'ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. Agregados actuales de participaciones de la campaña; no es el dashboard global. responsibility usa SIN_ASIGNAR o NO_ELEGIBLE:{userId} según estado del usuario y membresía actual del tenant. activity.manual cuenta NOTE/CALL/EMAIL/MEETING/OTHER; activity.events cuenta el resto, incluidas correcciones. Todos los agregados se leen de una misma instantánea: un cambio concurrente aparece completo en la consulta siguiente, nunca repartido entre campos.'
       operationId: getCampaignDashboard
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -409,6 +436,7 @@ paths:
     get:
       tags: [Campaigns, Prospects]
       summary: Consulta el contexto de participación de un prospecto
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. La participación debe pertenecer al tenant actual.
       operationId: getCampaignParticipation
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -422,6 +450,7 @@ paths:
     patch:
       tags: [Campaigns, Prospects]
       summary: Cambia la etapa comercial contextual
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. No modifica status maestro ni evaluación.
       operationId: updateCampaignParticipationStage
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -437,7 +466,7 @@ paths:
     patch:
       tags: [Campaigns, Prospects]
       summary: Cambia la evaluación contextual
-      description: NO_APTO exige reason no vacío.
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. NO_APTO exige reason no vacío después de quitar espacios en extremos; motivo opcional en los otros valores.
       operationId: updateCampaignParticipationEvaluation
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -453,6 +482,7 @@ paths:
     get:
       tags: [Campaigns, Prospects]
       summary: Lista responsables elegibles del tenant
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. Sólo usuarios activos con membresía en el tenant; no concede permisos nuevos.
       operationId: listEligibleCampaignResponsibles
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -466,6 +496,7 @@ paths:
     put:
       tags: [Campaigns, Prospects]
       summary: Asigna responsable elegible a una participación
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. responsibleId debe ser un usuario activo y miembro del tenant; de lo contrario responde 400 sin modificar la asignación.
       operationId: assignCampaignParticipationResponsible
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -480,6 +511,7 @@ paths:
     delete:
       tags: [Campaigns, Prospects]
       summary: Quita el responsable de una participación
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. Conserva el historial y deja responsibleId nulo.
       operationId: removeCampaignParticipationResponsible
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -493,18 +525,33 @@ paths:
     get:
       tags: [Campaigns, Prospects]
       summary: Lista bitácora contextual paginada
+      description: |
+        ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN.
+        Orden fijo recordedAt descendente e id descendente. Se aceptan search,
+        sortBy y sortOrder heredados de PaginationDto, pero no alteran este listado.
       operationId: listCampaignParticipationActivities
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/CampaignPathId' }, { $ref: '#/components/parameters/ProspectPathId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }]
+      parameters:
+        - { $ref: '#/components/parameters/CampaignPathId' }
+        - { $ref: '#/components/parameters/ProspectPathId' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Search' }
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [name, email, status, createdAt, updatedAt], default: name }
+        - { $ref: '#/components/parameters/SortOrder' }
       responses:
         '200': { $ref: '#/components/responses/CampaignActivityPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     post:
       tags: [Campaigns, Prospects]
       summary: Registra una actividad manual o corrección referenciada
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. No envía comunicaciones. correctsId referencia una entrada de la misma participación y genera CORRECTION sin editar el original. declaredAt inválido devuelve 400; recordedAt y actor se asignan en servidor.
       operationId: createCampaignParticipationActivity
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -519,11 +566,30 @@ paths:
   /api/v1/prospects:
     post:
       tags: [Prospects]
-      summary: Crea un prospecto manual
+      summary: Crea o reutiliza un prospecto para una campaña
       description: |
         Disponible para ADMIN y OWNER con una organización seleccionada.
         La campaña debe pertenecer a esa organización.
-        El backend asigna source=manual y sourceIdentifier=null.
+        Sin identidad externa indicada, un maestro nuevo usa source=manual y
+        sourceIdentifier=null. Si se proporcionan identitySource e identityIdentifier,
+        el backend puede crear con source=google_maps e identificador provisto.
+        Señal mínima declarada por ADMIN/OWNER, sin verificación online de Google ni
+        regex de formato externo: identificador no blanco, máximo 512 caracteres,
+        trim y casing exacto (no lowercase), único dentro del tenant. Identificadores
+        con distinto casing no son la misma identidad. Una colisión con llaves derivadas
+        históricas devuelve 409 seguro, sin auto-merge ni reescritura histórica.
+        Una coincidencia fuerte encontrada reutiliza el maestro y asegura la asociación,
+        preservando id, origen, atributos e historial comercial existente; no actualiza
+        el maestro. La respuesta sigue siendo un Prospect, también al reutilizarlo.
+        Una coincidencia débil requiere decisión explícita y devuelve 409, al igual que
+        una colisión concurrente al crear. No interpretar 201 como prueba de maestro nuevo.
+        Para candidatos débiles, consultar POST /api/v1/prospects/match y enviar a
+        POST /api/v1/prospects/resolve los datos de alta más resolution CREATE,
+        LINK_EXISTING (con candidateId revalidado) o SKIP. No reintentar a ciegas
+        después de 409: volver a consultar coincidencias. Para strongProspect, este
+        POST es el camino actual de reutilización; resolve no acepta todavía su ID
+        cuando está excluido de candidates. Los errores conservan ErrorResponse;
+        el 409 no garantiza un código de dominio ni candidatos en details.
       operationId: createProspect
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -534,7 +600,7 @@ paths:
               $ref: '#/components/schemas/CreateProspectRequest'
       responses:
         '201':
-          description: Prospecto creado y asociado a la campaña.
+          description: Prospecto creado o reutilizado y asociado a la campaña; conserva la representación Prospect y el wrapper de éxito.
           content:
             application/json:
               schema:
@@ -548,6 +614,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
     get:
       tags: [Prospects]
@@ -608,6 +675,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '413':
           description: El archivo supera 5 MB.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
   /api/v1/prospects/import/confirm:
     post:
       tags: [Prospects]
@@ -620,7 +688,11 @@ paths:
         decisión por registro NEW o MATCH; no incluir registros INVALID ni CONFLICT.
         Una fila CONFLICT por múltiples candidatos se rechaza con action=REJECTED;
         no acepta candidateId ni selecciona un candidato arbitrariamente.
-        NEW admite CREATE o SKIP. MATCH admite LINK_EXISTING, UPDATE_EXISTING o SKIP.
+        NEW admite CREATE o SKIP. MATCH con un único candidato débil admite CREATE
+        explícito para crear un maestro distinto conscientemente, LINK_EXISTING,
+        UPDATE_EXISTING o SKIP. CREATE no modifica al candidato anterior y registra
+        la decisión y los candidateIds en la procedencia confirmada dentro de la transacción.
+        INVALID y CONFLICT siguen REJECTED, sin candidateId ni selección de candidato.
         LINK_EXISTING solo asegura la asociación, sin editar ni reactivar una asociación
         existente. UPDATE_EXISTING edita los campos importables presentes y asegura la
         asociación; requiere selección explícita y afecta a todas las campañas que
@@ -665,6 +737,7 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '413':
           description: El archivo supera 5 MB.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
   /api/v1/prospects/{id}:
     parameters: [{ $ref: '#/components/parameters/EntityId' }]
     get:
@@ -687,7 +760,13 @@ paths:
     patch:
       tags: [Prospects]
       summary: Actualiza parcialmente un prospecto
-      description: Campo omitido no se modifica; null es válido en campos nullable.
+      description: |
+        ADMIN, OWNER y MEMBER con tenant seleccionado. Campo omitido no se modifica;
+        null es válido en campos nullable. contextCampaignId opcional, no nulo ni blanco,
+        máximo 128 caracteres; no es un atributo maestro. El servidor revalida la
+        participación en el mismo tenant dentro de la transacción antes de escribir.
+        Sin contexto usa la campaña de origen; con contexto B registra MASTER_UPDATED
+        en B conservando origen A. Enviar sólo contextCampaignId devuelve 400.
       operationId: updateProspect
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -744,12 +823,14 @@ paths:
     get:
       tags: [Prospects, Campaigns]
       summary: Lista campañas asociadas a un prospecto maestro
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. Sólo campañas del tenant actual; origen se identifica sin duplicar la asociación. Orden fijo addedAt descendente y campaignId ascendente. page=1, limit=20 (máximo 100). Conserva data.originCampaignId y data.campaigns; data.meta contiene la paginación. responsible refleja elegibilidad actual; latestActivity es el último registro por recordedAt descendente e id descendente o null.
       operationId: listProspectCampaigns
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }]
       responses:
         '200': { $ref: '#/components/responses/ProspectCampaignsResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -757,12 +838,14 @@ paths:
     get:
       tags: [Prospects]
       summary: Lista la procedencia global confirmada del prospecto
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. Eventos confirmados del tenant ordenados por recordedAt descendente e id descendente. page=1, limit=20 (máximo 100); data es un arreglo y meta se devuelve en el nivel superior. No inventa eventos históricos ni registra previews u omisiones.
       operationId: listProspectProvenance
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }]
       responses:
         '200': { $ref: '#/components/responses/ProspectProvenanceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1034,6 +1117,9 @@ components:
     ProspectPage:
       description: Prospectos paginados.
       content: { application/json: { schema: { $ref: '#/components/schemas/ProspectPageResponse' } } }
+    CampaignProspectPage:
+      description: Prospectos maestros paginados con participación contextual aditiva.
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: object, properties: { data: { type: array, items: { allOf: [{ $ref: '#/components/schemas/Prospect' }, { type: object, properties: { participation: { $ref: '#/components/schemas/CampaignParticipation' } } }] } }, meta: { $ref: '#/components/schemas/PaginationMeta' } } }] } } }
     JobPage:
       description: Jobs paginados.
       content: { application/json: { schema: { $ref: '#/components/schemas/JobPageResponse' } } }
@@ -1063,7 +1149,7 @@ components:
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: object, properties: { data: { $ref: '#/components/schemas/ProspectCampaigns' } } }] } } }
     ProspectProvenanceResponse:
       description: Eventos globales de procedencia confirmados.
-      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ProspectProvenanceEvent' } } } }] } } }
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ProspectProvenanceEvent' } }, meta: { $ref: '#/components/schemas/PaginationMeta' } } }] } } }
   schemas:
     SuccessResponse:
       type: object
@@ -1187,6 +1273,10 @@ components:
         metadata: { type: object, nullable: true, additionalProperties: true }
         createdAt: { $ref: '#/components/schemas/DateTime' }
         updatedAt: { $ref: '#/components/schemas/DateTime' }
+    ContextRangeTimestamp:
+      type: string
+      pattern: 'T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$'
+      description: ISO 8601 válido con zona explícita; extremo inclusivo. El servidor valida además que from sea menor o igual a to.
     ResponsibleUser:
       type: object
       required: [id, name, email, status]
@@ -1195,6 +1285,7 @@ components:
         name: { type: string }
         email: { type: string, format: email }
         status: { $ref: '#/components/schemas/UserStatus' }
+        eligible: { type: boolean, description: En contexto de participación indica usuario activo con membresía actual del tenant; no expone userTenants. }
     CampaignParticipation:
       type: object
       required: [campaignId, prospectId, status, commercialStage, evaluation, responsibleId, addedAt, updatedAt]
@@ -1278,13 +1369,24 @@ components:
         candidates: { type: array, items: { $ref: '#/components/schemas/Prospect' } }
         resolutionRequired: { type: boolean }
     ResolveProspectRequest:
-      allOf:
-        - $ref: '#/components/schemas/CreateProspectRequest'
-        - type: object
-          required: [resolution]
-          properties:
-            resolution: { type: string, enum: [CREATE, LINK_EXISTING, SKIP] }
-            candidateId: { type: string, pattern: '\S', maxLength: 128 }
+      type: object
+      additionalProperties: false
+      required: [campaignId, name, resolution]
+      properties:
+        campaignId: { type: string, pattern: '^\S+$' }
+        name: { type: string, pattern: '\S' }
+        category: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        website: { type: string, format: uri, nullable: true }
+        language: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVO, INACTIVO], default: ACTIVO }
+        metadata: { type: object, nullable: true, additionalProperties: true }
+        identitySource: { type: string, enum: [google_maps] }
+        identityIdentifier: { type: string, pattern: '\S', maxLength: 512 }
+        resolution: { type: string, enum: [CREATE, LINK_EXISTING, SKIP] }
+        candidateId: { type: string, pattern: '\S', maxLength: 128 }
     ProspectResolve:
       type: object
       required: [action]
@@ -1296,6 +1398,7 @@ components:
       required: [originCampaignId, campaigns]
       properties:
         originCampaignId: { type: string }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
         campaigns:
           type: array
           items:
@@ -1306,7 +1409,8 @@ components:
               isOrigin: { type: boolean }
               stage: { $ref: '#/components/schemas/CommercialStage' }
               evaluation: { $ref: '#/components/schemas/CommercialEvaluation' }
-              responsible: { type: object, nullable: true, properties: { id: { type: string }, name: { type: string }, status: { $ref: '#/components/schemas/UserStatus' } } }
+              responsible: { type: object, nullable: true, properties: { id: { type: string }, name: { type: string }, status: { $ref: '#/components/schemas/UserStatus' }, eligible: { type: boolean } } }
+              latestActivity: { type: object, nullable: true, required: [id, type, content, recordedAt], properties: { id: { type: string }, type: { $ref: '#/components/schemas/CampaignActivityType' }, content: { type: string, nullable: true }, recordedAt: { $ref: '#/components/schemas/DateTime' } } }
               addedAt: { $ref: '#/components/schemas/DateTime' }
     ProspectProvenanceEvent:
       type: object
@@ -1600,10 +1704,22 @@ components:
         identityIdentifier:
           type: string
           pattern: '\S'
+          maxLength: 512
     UpdateProspectRequest:
       type: object
       minProperties: 1
+      anyOf:
+        - required: [name]
+        - required: [category]
+        - required: [address]
+        - required: [phone]
+        - required: [email]
+        - required: [website]
+        - required: [language]
+        - required: [status]
+        - required: [metadata]
       properties:
+        contextCampaignId: { type: string, pattern: '\S', maxLength: 128, description: Contexto de participación del mismo tenant, revalidado transaccionalmente; no cuenta como campo maestro editable. }
         name: { type: string }
         category: { type: string, nullable: true }
         address: { type: string, nullable: true }

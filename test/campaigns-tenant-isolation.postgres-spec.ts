@@ -257,6 +257,170 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
     },
   );
 
+  it('C6 HTTP date filters preserve master fields and add the selected participation context', async () => {
+    const before = await snapshot();
+    const response = await http()
+      .get(`/api/v1/campaigns/${campaigns[0]}/prospects`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .query({
+        addedFrom: '2000-01-01T00:00:00Z',
+        addedTo: '2100-01-01T00:00:00Z',
+        activityFrom: '2000-01-01T00:00:00Z',
+        activityTo: '2100-01-01T00:00:00Z',
+        page: 1,
+        limit: 1,
+      })
+      .expect(200);
+    const payload = response.body as {
+      success: boolean;
+      data: { id: string; status: string; participation: object }[];
+      meta: { page: number; limit: number; total: number; totalPages: number };
+    };
+    expect(payload.success).toBe(true);
+    expect(payload.meta).toEqual({
+      page: 1,
+      limit: 1,
+      total: 1,
+      totalPages: 1,
+    });
+    expect(payload.data).toHaveLength(1);
+    expect(payload.data[0]).toMatchObject({
+      id: prospects[0],
+      status: 'ACTIVO',
+      participation: {
+        campaignId: campaigns[0],
+        prospectId: prospects[0],
+        commercialStage: 'SIN_GESTIONAR',
+        evaluation: 'SIN_EVALUAR',
+        responsibleId: null,
+        responsible: null,
+      },
+    });
+    expect(JSON.stringify(payload)).not.toContain(prospects[1]);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it.each([
+    { addedFrom: 'not-a-date' },
+    { addedFrom: '2026-01-01' },
+    { activityTo: '2026-01-01T10:00:00' },
+    { addedFrom: '2030-01-01T00:00:00Z', addedTo: '2020-01-01T00:00:00Z' },
+    {
+      activityFrom: '2030-01-01T00:00:00Z',
+      activityTo: '2020-01-01T00:00:00Z',
+    },
+  ])(
+    'C6 HTTP rejects invalid or inverted date filters without writes: %j',
+    async (query) => {
+      const before = await snapshot();
+      const response = await http()
+        .get(`/api/v1/campaigns/${campaigns[0]}/prospects`)
+        .set('Authorization', `Bearer ${ownerA}`)
+        .query(query)
+        .expect(400);
+      expect((response.body as { error: { code: string } }).error.code).toBe(
+        'VALIDATION_ERROR',
+      );
+      expect(await snapshot()).toEqual(before);
+    },
+  );
+
+  it('P3 HTTP paginates provenance with the existing normalized envelope and no writes', async () => {
+    const before = await snapshot();
+    const response = await http()
+      .get(`/api/v1/prospects/${prospects[0]}/provenance`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .query({ page: 2, limit: 1 })
+      .expect(200);
+    expect(response.body as unknown).toMatchObject({
+      success: true,
+      data: [],
+      meta: { page: 2, limit: 1, total: 1, totalPages: 1 },
+    });
+    const foreign = await http()
+      .get(`/api/v1/prospects/${prospects[1]}/provenance`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .query({ page: 1, limit: 1 })
+      .expect(404);
+    expect((foreign.body as { error: { code: string } }).error.code).toBe(
+      'NOT_FOUND',
+    );
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it.each([{ page: 0 }, { limit: 101 }, { limit: 'invalid' }])(
+    'P3 HTTP rejects invalid pagination: %j',
+    async (query) => {
+      const before = await snapshot();
+      await http()
+        .get(`/api/v1/prospects/${prospects[0]}/provenance`)
+        .set('Authorization', `Bearer ${ownerA}`)
+        .query(query)
+        .expect(400);
+      expect(await snapshot()).toEqual(before);
+    },
+  );
+
+  it('P2 HTTP preserves the associated-campaign object and adds pagination and contextual activity', async () => {
+    const before = await snapshot();
+    const response = await http().get(`/api/v1/prospects/${prospects[0]}/campaigns`)
+      .set('Authorization', `Bearer ${ownerA}`).query({ page: 1, limit: 1 }).expect(200);
+    expect(response.body as unknown).toMatchObject({ success: true, data: {
+      originCampaignId: campaigns[0],
+      meta: { page: 1, limit: 1, total: 1, totalPages: 1 },
+      campaigns: [{ campaign: { id: campaigns[0] }, isOrigin: true, responsible: null,
+        latestActivity: { type: 'NOTE', content: 'Synthetic contextual note' } }],
+    } });
+    expect(JSON.stringify(response.body)).not.toContain(prospects[1]);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it.each([
+    { contextCampaignId: null, phone: '000' },
+    { contextCampaignId: '   ', phone: '000' },
+    { contextCampaignId: 'valid-but-context-only' },
+  ])('PATCH HTTP rejects invalid/context-only requests without writes: %j', async (requestBody) => {
+    const before = await snapshot();
+    await http().patch(`/api/v1/prospects/${prospects[0]}`)
+      .set('Authorization', `Bearer ${ownerA}`).send(requestBody).expect(400);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('PATCH HTTP hides a foreign contextual campaign without writing master or history', async () => {
+    const before = await snapshot();
+    await http().patch(`/api/v1/prospects/${prospects[0]}`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ phone: '000', contextCampaignId: campaigns[1] }).expect(404);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('D02 manual weak match returns an actionable 409 wrapper without leaking foreign candidates', async () => {
+    const before = await snapshot();
+    const response = await http()
+      .post('/api/v1/prospects')
+      .set('Authorization', `Bearer ${ownerA}`)
+      .send({ campaignId: campaigns[0], name: 'Empresa Demo' })
+      .expect(409);
+    const payload = response.body as {
+      success: boolean;
+      error: {
+        code: string;
+        message: string;
+        details: { reason: string; candidates: { id: string }[] };
+      };
+    };
+    expect(payload.success).toBe(false);
+    expect(payload.error.code).toBe('CONFLICT');
+    expect(payload.error.message).not.toBe('Internal server error');
+    expect(payload.error.details.reason).toBe(
+      'PROSPECT_MATCH_REQUIRES_DECISION',
+    );
+    expect(
+      payload.error.details.candidates.map((candidate) => candidate.id),
+    ).toEqual([prospects[0]]);
+    expect(await snapshot()).toEqual(before);
+  });
+
   it('denies an external responsible and keeps campaign aggregates tenant-scoped', async () => {
     const before = await snapshot();
     await http()
@@ -432,7 +596,9 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       .get(`${base(campaigns[0], prospects[0])}/activities?page=1&limit=20`)
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
-    expect(body<{ data: unknown[] }>(activities).data.length).toBeGreaterThan(1);
+    expect(body<{ data: unknown[] }>(activities).data.length).toBeGreaterThan(
+      1,
+    );
 
     await http()
       .put(`${base(campaigns[0], prospects[0])}/responsible`)
@@ -461,7 +627,13 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       .get(`/api/v1/campaigns/${campaigns[0]}/dashboard`)
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
-    expect(body<{ total: number; stages: Record<string, number>; evaluations: Record<string, number> }>(dashboard).data).toMatchObject({
+    expect(
+      body<{
+        total: number;
+        stages: Record<string, number>;
+        evaluations: Record<string, number>;
+      }>(dashboard).data,
+    ).toMatchObject({
       total: 1,
       stages: { EN_SEGUIMIENTO: 1 },
       evaluations: { APTO: 1 },
@@ -471,13 +643,17 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       .get(`/api/v1/prospects/${prospects[0]}/campaigns`)
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
-    expect(body<{ campaigns: unknown[] }>(campaignsView).data.campaigns.length).toBeGreaterThanOrEqual(2);
+    expect(
+      body<{ campaigns: unknown[] }>(campaignsView).data.campaigns.length,
+    ).toBeGreaterThanOrEqual(2);
 
     const provenance = await http()
       .get(`/api/v1/prospects/${prospects[0]}/provenance`)
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
-    expect(body<{ data: unknown[] }>(provenance).data.length).toBeGreaterThan(0);
+    expect(body<{ data: unknown[] }>(provenance).data.length).toBeGreaterThan(
+      0,
+    );
   });
 
   it('T16 preserves responsibility history when a user loses eligibility', async () => {
@@ -515,7 +691,10 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
   });
 
   it('T18-T20 JOIN, empty dashboard and legacy-only dashboard remain isolated', async () => {
-    for (const content of ['First synthetic activity', 'Second synthetic activity']) {
+    for (const content of [
+      'First synthetic activity',
+      'Second synthetic activity',
+    ]) {
       await http()
         .post(`${base(campaigns[0], prospects[0])}/activities`)
         .set('Authorization', `Bearer ${ownerA}`)
@@ -526,7 +705,11 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       .get(`/api/v1/campaigns/${campaigns[0]}/prospects`)
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
-    expect(body<{ id: string }[]>(listed).data.filter((item) => item.id === prospects[0])).toHaveLength(1);
+    expect(
+      body<{ id: string }[]>(listed).data.filter(
+        (item) => item.id === prospects[0],
+      ),
+    ).toHaveLength(1);
 
     const empty = await db.campaign.create({
       data: {
@@ -557,7 +740,11 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       .get(`/api/v1/campaigns/${empty.id}/dashboard`)
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
-    expect(body<{ total: number; incorporation: Record<string, number> }>(legacyDashboard).data).toMatchObject({
+    expect(
+      body<{ total: number; incorporation: Record<string, number> }>(
+        legacyDashboard,
+      ).data,
+    ).toMatchObject({
       total: 1,
       incorporation: { unknownLegacy: 1 },
     });

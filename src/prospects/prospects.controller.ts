@@ -13,6 +13,7 @@ import { UpdateProspectRequest } from './dto/update-prospect.request';
 import { ProspectsService } from './prospects.service';
 import { CreateProspectRequest } from './dto/create-prospect.request';
 import { ResolveProspectRequest } from './dto/resolve-prospect.request';
+import { ProspectHistoryQuery } from './dto/prospect-history.query';
 
 @Controller('prospects')
 @Roles('ADMIN', 'OWNER', 'MEMBER')
@@ -48,13 +49,13 @@ export class ProspectsController {
   }
 
   @Get(':id/campaigns')
-  campaigns(@Param('id') id: string) {
-    return this.prospectsService.campaignsForProspect(id);
+  campaigns(@Param('id') id: string, @Query() query: ProspectHistoryQuery) {
+    return this.prospectsService.campaignsForProspect(id, query);
   }
 
   @Get(':id/provenance')
-  provenance(@Param('id') id: string) {
-    return this.prospectsService.provenance(id);
+  provenance(@Param('id') id: string, @Query() query: ProspectHistoryQuery) {
+    return this.prospectsService.provenance(id, query);
   }
 
   @Patch(':id')

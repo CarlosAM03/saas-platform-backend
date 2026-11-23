@@ -105,6 +105,36 @@ describe('ProspectImportsService', () => {
       expect(tx.prospect.create).not.toHaveBeenCalled();
     });
   });
+  it('RI06 permits conscious CREATE for a single weak match and records the decision', async () => {
+    candidates = [match()];
+    await run(async () => {
+      const preview = await service.preview('campaign', file);
+      expect(preview.rows[0].classification).toBe('MATCH');
+      expect(tx.prospect.create).not.toHaveBeenCalled();
+      const result = await service.confirm(
+        'campaign',
+        file,
+        preview.previewReference,
+        '[{"record":1,"action":"CREATE"},{"record":2,"action":"SKIP"}]',
+      );
+      expect(result.summary.created).toBe(1);
+      expect(tx.prospect.update).not.toHaveBeenCalled();
+      expect(tx.prospect.create).toHaveBeenCalledTimes(1);
+      expect(tx.prospectProvenance.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: 'CREATED',
+          source: 'csv',
+          prospectId: 'new',
+          details: { resolution: 'CREATE', candidateIds: ['existing'] },
+        }) as unknown,
+      });
+      expect(result.rows[0]).toEqual({
+        record: 1,
+        action: 'CREATE',
+        prospectId: 'new',
+      });
+    });
+  });
   it('explicit UPDATE_EXISTING clears included nullable fields and preserves absent fields', async () => {
     candidates = [match()];
     await run(async () => {
@@ -121,6 +151,35 @@ describe('ProspectImportsService', () => {
       });
     });
   });
+  it.each([false, true])(
+    'RI08 UPDATE records LINKED only for a newly created association (existing=%s)',
+    async (existing) => {
+      candidates = [match()];
+      tx.campaignProspect.findFirst.mockResolvedValue(
+        existing ? { campaignId: 'campaign' } : null,
+      );
+      await run(async () => {
+        const preview = await service.preview('campaign', file);
+        await service.confirm(
+          'campaign',
+          file,
+          preview.previewReference,
+          '[{"record":1,"action":"UPDATE_EXISTING"},{"record":2,"action":"SKIP"}]',
+        );
+        const types = tx.prospectProvenance.create.mock.calls.map(
+          (call: unknown[]) =>
+            (call[0] as { data: { type: string } }).data.type,
+        );
+        expect(types).toContain('MASTER_UPDATED');
+        expect(types.filter((type) => type === 'LINKED')).toHaveLength(
+          existing ? 0 : 1,
+        );
+        expect(tx.campaignActivity.create).toHaveBeenCalledTimes(
+          existing ? 0 : 1,
+        );
+      });
+    },
+  );
   it('rejects changed matches and repeated confirmation after changes', async () => {
     await run(async () => {
       const preview = await service.preview('campaign', file);

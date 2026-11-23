@@ -4,6 +4,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { TenantContextService } from '../src/common/context/tenant-context.service';
 import { ProspectCsvParser } from '../src/prospects/imports/prospect-csv.parser';
 import { ProspectImportsService } from '../src/prospects/imports/prospect-imports.service';
+import { CampaignsService } from '../src/campaigns/campaigns.service';
 
 describe('CSV atomicity with disposable PostgreSQL', () => {
   let prisma: PrismaService;
@@ -136,6 +137,192 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
       ).toBe(0);
     });
   });
+  it('RI06 CSV creates a distinct master consciously and preserves the weak candidate', async () => {
+    const original = await prisma.prospect.create({
+      data: { tenantId, campaignId, name: 'Empresa Demo', source: 'manual' },
+    });
+    await prisma.campaignProspect.create({
+      data: { campaignId, prospectId: original.id, commercialStage: 'CERRADO' },
+    });
+    const participation = await prisma.campaignProspect.findUniqueOrThrow({
+      where: { campaignId_prospectId: { campaignId, prospectId: original.id } },
+    });
+    const csv = Buffer.from('name\nEmpresa Demo');
+    await run(async () => {
+      const preview = await service.preview(campaignId, csv);
+      expect(preview.rows[0].classification).toBe('MATCH');
+      expect(
+        await prisma.prospectProvenance.count({ where: { tenantId } }),
+      ).toBe(0);
+      const result = await service.confirm(
+        campaignId,
+        csv,
+        preview.previewReference,
+        '[{"record":1,"action":"CREATE"}]',
+      );
+      const createdId = result.rows[0].prospectId;
+      expect(result.summary.created).toBe(1);
+      expect(createdId).toBeDefined();
+      expect(createdId).not.toBe(original.id);
+      expect(
+        await prisma.prospect.findUniqueOrThrow({ where: { id: original.id } }),
+      ).toEqual(original);
+      expect(
+        await prisma.campaignProspect.findUniqueOrThrow({
+          where: {
+            campaignId_prospectId: { campaignId, prospectId: original.id },
+          },
+        }),
+      ).toEqual(participation);
+      expect(
+        await prisma.campaignProspect.findUniqueOrThrow({
+          where: {
+            campaignId_prospectId: { campaignId, prospectId: createdId! },
+          },
+        }),
+      ).toMatchObject({
+        commercialStage: 'SIN_GESTIONAR',
+        evaluation: 'SIN_EVALUAR',
+        responsibleId: null,
+      });
+      const provenance = await prisma.prospectProvenance.findMany({
+        where: { tenantId },
+      });
+      expect(provenance).toHaveLength(1);
+      expect(provenance[0]).toMatchObject({
+        prospectId: createdId,
+        type: 'CREATED',
+        source: 'csv',
+        actorUserId: userId,
+        details: { resolution: 'CREATE', candidateIds: [original.id] },
+      });
+      expect(await prisma.campaignActivity.count({ where: { tenantId } })).toBe(
+        1,
+      );
+      await expect(
+        service.confirm(
+          campaignId,
+          csv,
+          preview.previewReference,
+          '[{"record":1,"action":"CREATE"}]',
+        ),
+      ).rejects.toThrow('new preview');
+      expect(await prisma.prospect.count({ where: { tenantId } })).toBe(2);
+    });
+  });
+
+  it('RI08 UPDATE in a new campaign proves reuse there without rewriting legacy incorporation', async () => {
+    const original = await prisma.prospect.create({
+      data: { tenantId, campaignId, name: 'Empresa Demo', source: 'manual' },
+    });
+    await prisma.campaignProspect.create({
+      data: { campaignId, prospectId: original.id },
+    });
+    const destination = await prisma.campaign.create({
+      data: { tenantId, name: 'Synthetic destination', createdBy: userId },
+    });
+    const dashboards = new CampaignsService(prisma, context);
+    const csv = Buffer.from('name\nEmpresa Demo');
+    try {
+      await run(async () => {
+        const preview = await service.preview(destination.id, csv);
+        expect(preview.rows[0].classification).toBe('MATCH');
+        const result = await service.confirm(
+          destination.id,
+          csv,
+          preview.previewReference,
+          '[{"record":1,"action":"UPDATE_EXISTING"}]',
+        );
+        expect(result.summary.updated).toBe(1);
+        expect(
+          (await dashboards.dashboard(destination.id)).incorporation,
+        ).toEqual({
+          new: 0,
+          reused: 1,
+          unknownLegacy: 0,
+        });
+        expect((await dashboards.dashboard(campaignId)).incorporation).toEqual({
+          new: 0,
+          reused: 0,
+          unknownLegacy: 1,
+        });
+        expect(
+          await prisma.prospectProvenance.count({
+            where: {
+              tenantId,
+              campaignId: destination.id,
+              prospectId: original.id,
+              type: 'LINKED',
+            },
+          }),
+        ).toBe(1);
+        // Updating an already existing legacy association must not manufacture incorporation evidence.
+        const existingPreview = await service.preview(campaignId, csv);
+        await service.confirm(
+          campaignId,
+          csv,
+          existingPreview.previewReference,
+          '[{"record":1,"action":"UPDATE_EXISTING"}]',
+        );
+        expect((await dashboards.dashboard(campaignId)).incorporation).toEqual({
+          new: 0,
+          reused: 0,
+          unknownLegacy: 1,
+        });
+        expect(
+          await prisma.prospectProvenance.count({
+            where: {
+              tenantId,
+              campaignId,
+              prospectId: original.id,
+              type: 'LINKED',
+            },
+          }),
+        ).toBe(0);
+        const repeat = await service.preview(destination.id, csv);
+        await service.confirm(
+          destination.id,
+          csv,
+          repeat.previewReference,
+          '[{"record":1,"action":"UPDATE_EXISTING"}]',
+        );
+        expect(
+          await prisma.prospectProvenance.count({
+            where: { tenantId, campaignId: destination.id, type: 'LINKED' },
+          }),
+        ).toBe(1);
+        expect(
+          await prisma.campaignActivity.count({
+            where: {
+              tenantId,
+              campaignId: destination.id,
+              type: 'ASSOCIATION',
+            },
+          }),
+        ).toBe(1);
+        expect(await prisma.prospect.count({ where: { tenantId } })).toBe(1);
+        expect(
+          (
+            await prisma.prospect.findUniqueOrThrow({
+              where: { id: original.id },
+            })
+          ).campaignId,
+        ).toBe(campaignId);
+      });
+    } finally {
+      await prisma.campaignActivity.deleteMany({
+        where: { tenantId, campaignId: destination.id },
+      });
+      await prisma.prospectProvenance.deleteMany({
+        where: { tenantId, campaignId: destination.id },
+      });
+      await prisma.campaignProspect.deleteMany({
+        where: { campaignId: destination.id },
+      });
+      await prisma.campaign.delete({ where: { id: destination.id } });
+    }
+  });
+
   it('T04/P4 rejects multiple candidates without changing any persisted row', async () => {
     await prisma.prospect.createMany({
       data: ['Empresa Demo', ' empresa   demo '].map((name) => ({

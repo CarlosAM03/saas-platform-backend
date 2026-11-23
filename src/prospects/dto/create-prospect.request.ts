@@ -6,6 +6,7 @@ import {
   IsString,
   IsUrl,
   Matches,
+  MaxLength,
   ValidateIf,
 } from 'class-validator';
 
@@ -61,5 +62,6 @@ export class CreateProspectRequest {
   @IsOptional()
   @IsString()
   @Matches(/\S/, { message: 'identityIdentifier no puede estar vacío' })
+  @MaxLength(512)
   identityIdentifier?: string;
 }

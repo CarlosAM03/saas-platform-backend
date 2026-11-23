@@ -52,6 +52,34 @@ const prospectSelect = {
   updatedAt: true,
 } satisfies Prisma.ProspectSelect;
 
+const responsibleSelect = (tenantId: string) =>
+  ({
+    id: true,
+    name: true,
+    email: true,
+    status: true,
+    userTenants: { where: { tenantId }, select: { tenantId: true } },
+  }) satisfies Prisma.UserSelect;
+
+type ResponsibleWithMembership = Prisma.UserGetPayload<{
+  select: ReturnType<typeof responsibleSelect>;
+}>;
+
+function withResponsibleEligibility<
+  T extends { responsible: ResponsibleWithMembership | null },
+>(participation: T) {
+  const { responsible, ...fields } = participation;
+  if (!responsible) return { ...fields, responsible: null };
+  const { userTenants, ...user } = responsible;
+  return {
+    ...fields,
+    responsible: {
+      ...user,
+      eligible: user.status === 'ACTIVO' && userTenants.length > 0,
+    },
+  };
+}
+
 @Injectable()
 export class CampaignsService {
   constructor(
@@ -155,10 +183,17 @@ export class CampaignsService {
 
   async findProspects(id: string, query: CampaignProspectsQuery) {
     const tenantId = this.context.requireTenantId();
+    const addedAt = this.dateRange(query.addedFrom, query.addedTo);
+    const recordedAt = this.dateRange(query.activityFrom, query.activityTo);
     await this.findOne(id);
     const participationFilter: Prisma.CampaignProspectWhereInput = {
       campaignId: id,
       campaign: { tenantId },
+      prospect: { tenantId },
+      ...(addedAt ? { addedAt } : {}),
+      ...(recordedAt
+        ? { activities: { some: { tenantId, campaignId: id, recordedAt } } }
+        : {}),
       ...(query.stage
         ? { commercialStage: query.stage as CommercialStage }
         : {}),
@@ -229,14 +264,37 @@ export class CampaignsService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.prospect.findMany({
         where,
-        select: prospectSelect,
+        select: {
+          ...prospectSelect,
+          campaignProspects: {
+            where: { campaignId: id, campaign: { tenantId } },
+            select: {
+              campaignId: true,
+              prospectId: true,
+              status: true,
+              commercialStage: true,
+              evaluation: true,
+              evaluationReason: true,
+              responsibleId: true,
+              addedAt: true,
+              updatedAt: true,
+              responsible: { select: responsibleSelect(tenantId) },
+            },
+          },
+        },
         orderBy: [{ [query.sortBy]: query.sortOrder }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
       }),
       this.prisma.prospect.count({ where }),
     ]);
-    return { data, meta: createPaginationMeta(query.page, query.limit, total) };
+    return {
+      data: data.map(({ campaignProspects, ...prospect }) => ({
+        ...prospect,
+        participation: withResponsibleEligibility(campaignProspects[0]),
+      })),
+      meta: createPaginationMeta(query.page, query.limit, total),
+    };
   }
 
   async getParticipation(campaignId: string, prospectId: string) {
@@ -250,12 +308,12 @@ export class CampaignsService {
       },
       include: {
         responsible: {
-          select: { id: true, name: true, email: true, status: true },
+          select: responsibleSelect(tenantId),
         },
       },
     });
     if (!participation) throw new NotFoundException('Participation not found');
-    return participation;
+    return withResponsibleEligibility(participation);
   }
 
   async updateStage(campaignId: string, prospectId: string, stage: string) {
@@ -263,6 +321,7 @@ export class CampaignsService {
     const tenantId = this.context.requireTenantId();
     const actorUserId = this.context.getRequiredContext().userId;
     return this.prisma.$transaction(async (tx) => {
+      await this.lockParticipation(tx, tenantId, campaignId, prospectId);
       const current = await tx.campaignProspect.findFirst({
         where: {
           campaignId,
@@ -314,6 +373,7 @@ export class CampaignsService {
     const cleanReason =
       nextEvaluation === 'NO_APTO' ? reason?.trim() : reason?.trim() || null;
     return this.prisma.$transaction(async (tx) => {
+      await this.lockParticipation(tx, tenantId, campaignId, prospectId);
       const current = await tx.campaignProspect.findFirst({
         where: {
           campaignId,
@@ -380,6 +440,7 @@ export class CampaignsService {
     const tenantId = this.context.requireTenantId();
     const actorUserId = this.context.getRequiredContext().userId;
     return this.prisma.$transaction(async (tx) => {
+      await this.lockParticipation(tx, tenantId, campaignId, prospectId);
       const current = await tx.campaignProspect.findFirst({
         where: {
           campaignId,
@@ -389,7 +450,7 @@ export class CampaignsService {
         },
         include: {
           responsible: {
-            select: { id: true, name: true, email: true, status: true },
+            select: responsibleSelect(tenantId),
           },
         },
       });
@@ -409,7 +470,8 @@ export class CampaignsService {
           );
         }
       }
-      if (current.responsibleId === responsibleId) return current;
+      if (current.responsibleId === responsibleId)
+        return withResponsibleEligibility(current);
       const updated = await tx.campaignProspect.update({
         where: {
           campaignId_prospectId: { campaignId, prospectId },
@@ -417,7 +479,7 @@ export class CampaignsService {
         data: { responsibleId },
         include: {
           responsible: {
-            select: { id: true, name: true, email: true, status: true },
+            select: responsibleSelect(tenantId),
           },
         },
       });
@@ -432,7 +494,7 @@ export class CampaignsService {
           newValue: responsibleId,
         },
       });
-      return updated;
+      return withResponsibleEligibility(updated);
     });
   }
 
@@ -523,33 +585,77 @@ export class CampaignsService {
 
   async dashboard(campaignId: string) {
     const tenantId = this.context.requireTenantId();
-    await this.findOne(campaignId);
-    const participations = await this.prisma.campaignProspect.findMany({
-      where: {
-        campaignId,
-        campaign: { tenantId },
-        prospect: { tenantId },
-      },
-      include: {
-        prospect: {
-          select: {
-            id: true,
-            provenanceEvents: {
-              where: { tenantId },
-              orderBy: { recordedAt: 'asc' },
-              take: 1,
-              select: {
-                type: true,
-                campaignId: true,
+    // Every aggregate must come from one snapshot. Sequential reads let a
+    // concurrent writer produce totals that do not add up.
+    const [participations, activities, manualActivities] =
+      await this.prisma.$transaction(
+        async (tx) => {
+          const campaign = await tx.campaign.findFirst({
+            where: { id: campaignId, tenantId },
+            select: { id: true },
+          });
+          if (!campaign) throw new NotFoundException('Campaign not found');
+          const participations = await tx.campaignProspect.findMany({
+            where: {
+              campaignId,
+              campaign: { tenantId },
+              prospect: { tenantId },
+            },
+            include: {
+              prospect: {
+                select: {
+                  id: true,
+                  provenanceEvents: {
+                    where: {
+                      tenantId,
+                      campaignId,
+                      type: { in: ['CREATED', 'LINKED'] },
+                    },
+                    orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
+                    take: 1,
+                    select: {
+                      type: true,
+                      campaignId: true,
+                    },
+                  },
+                },
+              },
+              responsible: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  userTenants: {
+                    where: { tenantId },
+                    select: { tenantId: true },
+                  },
+                },
               },
             },
-          },
+          });
+          const manualTypes = [
+            CampaignActivityType.NOTE,
+            CampaignActivityType.CALL,
+            CampaignActivityType.EMAIL,
+            CampaignActivityType.MEETING,
+            CampaignActivityType.OTHER,
+          ];
+          const [activities, manualActivities] = await Promise.all([
+            tx.campaignActivity.count({
+              where: { tenantId, campaignId },
+            }),
+            tx.campaignActivity.count({
+              where: {
+                tenantId,
+                campaignId,
+                type: { in: manualTypes },
+              },
+            }),
+          ]);
+          return [participations, activities, manualActivities] as const;
         },
-        responsible: {
-          select: { id: true, name: true, status: true },
-        },
-      },
-    });
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      );
     const stages: Record<string, number> = {
       SIN_GESTIONAR: 0,
       EN_INVESTIGACION: 0,
@@ -577,7 +683,8 @@ export class CampaignsService {
           (responsibility['SIN_ASIGNAR'] ?? 0) + 1;
       } else {
         const responsibleStatus =
-          participation.responsible?.status === 'ACTIVO'
+          participation.responsible?.status === 'ACTIVO' &&
+          participation.responsible.userTenants.length > 0
             ? participation.responsibleId
             : `NO_ELEGIBLE:${participation.responsibleId}`;
         responsibility[responsibleStatus] =
@@ -586,32 +693,12 @@ export class CampaignsService {
       const origin = participation.prospect.provenanceEvents[0];
       if (!origin) {
         incorporation.unknownLegacy++;
-      } else if (
-        origin.type === 'CREATED' &&
-        origin.campaignId === campaignId
-      ) {
+      } else if (origin.type === 'CREATED') {
         incorporation.new++;
       } else {
         incorporation.reused++;
       }
     }
-    const activities = await this.prisma.campaignActivity.count({
-      where: { tenantId, campaignId },
-    });
-    const manualTypes = [
-      CampaignActivityType.NOTE,
-      CampaignActivityType.CALL,
-      CampaignActivityType.EMAIL,
-      CampaignActivityType.MEETING,
-      CampaignActivityType.OTHER,
-    ];
-    const manualActivities = await this.prisma.campaignActivity.count({
-      where: {
-        tenantId,
-        campaignId,
-        type: { in: manualTypes },
-      },
-    });
     return {
       total: participations.length,
       stages,
@@ -624,6 +711,46 @@ export class CampaignsService {
       },
       incorporation,
     };
+  }
+
+  private dateRange(
+    from?: string,
+    to?: string,
+  ): Prisma.DateTimeFilter | undefined {
+    if (from === undefined && to === undefined) return undefined;
+    const gte = from === undefined ? undefined : new Date(from);
+    const lte = to === undefined ? undefined : new Date(to);
+    if (
+      (gte && Number.isNaN(gte.getTime())) ||
+      (lte && Number.isNaN(lte.getTime())) ||
+      (gte && lte && gte > lte)
+    )
+      throw new BadRequestException('Invalid or inverted date range');
+    return { gte, lte };
+  }
+
+  private async lockParticipation(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    campaignId: string,
+    prospectId: string,
+  ): Promise<void> {
+    // Serialize state + history changes before reading the previous value.
+    // Lock only the participation; joined tenant checks preserve hidden 404s.
+    const rows = await tx.$queryRaw<{ campaign_id: string }[]>`
+      SELECT cp.campaign_id
+      FROM campaign_prospects AS cp
+      JOIN campaigns AS c ON c.id = cp.campaign_id
+      JOIN prospects AS p ON p.id = cp.prospect_id
+      WHERE cp.campaign_id = ${campaignId}
+        AND cp.prospect_id = ${prospectId}
+        AND c.tenant_id = ${tenantId}
+        AND p.tenant_id = ${tenantId}
+      FOR UPDATE OF cp
+    `;
+    if (rows.length === 0) {
+      throw new NotFoundException('Participation not found');
+    }
   }
 
   private handlePersistenceError(error: unknown): never {
