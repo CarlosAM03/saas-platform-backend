@@ -368,6 +368,40 @@ describe('CP prospect review regressions with PostgreSQL', () => {
     ).toEqual(stored);
   });
 
+  it('AC-P4-04: explicit choice is revalidated server-side when the candidate no longer matches', async () => {
+    const stored = await db.prospect.create({
+      data: {
+        tenantId: tenants[0],
+        campaignId: campaigns[0],
+        name: 'Stale Candidate',
+        source: 'manual',
+      },
+    });
+    const before = await counts();
+    const service = new ProspectsService(db, context);
+    // The chosen candidate is no longer a candidate for this request.
+    await expect(
+      run(tenants[0], () =>
+        service.resolve({
+          ...request(),
+          name: 'Totally Different Name',
+          resolution: 'LINK_EXISTING',
+          candidateId: stored.id,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(await counts()).toEqual(before);
+    // A stale candidate id is never linked silently.
+    expect(
+      await db.campaignProspect.count({
+        where: { campaignId: campaigns[0], prospectId: stored.id },
+      }),
+    ).toBe(0);
+    expect(
+      await db.prospectProvenance.count({ where: { prospectId: stored.id } }),
+    ).toBe(0);
+  });
+
   it('AC-P1-04: CREATE durably records the conscious decision, actor and tenant-local candidates', async () => {
     const existing = await db.prospect.create({
       data: {

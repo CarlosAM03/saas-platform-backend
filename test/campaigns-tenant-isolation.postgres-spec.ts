@@ -464,14 +464,42 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
     await db.campaignProspect.create({
       data: { campaignId: campaign.id, prospectId: prospect.id },
     });
-    const admin = await db.user.findUniqueOrThrow({ where: { id: users[0] } });
+    // A platform ADMIN, as AuthService.createToken emits it: platformRole ADMIN
+    // in the database, no tenant membership, tenantRole null in the payload.
+    const adminUser = await db.user.create({
+      data: {
+        name: 'Platform Admin',
+        email: `${randomUUID()}@synthetic.test`,
+        passwordHash: 'not-used',
+        platformRole: 'ADMIN',
+      },
+    });
+    expect(await db.userTenant.count({ where: { userId: adminUser.id } })).toBe(
+      0,
+    );
     const adminToken = app.get(JwtService).sign({
-      sub: admin.id,
-      email: admin.email,
+      sub: adminUser.id,
+      email: adminUser.email,
       tenantId: tenants[0],
       tenantRole: null,
       platformRole: 'ADMIN',
     });
+    // A user without membership and without ADMIN authority stays forbidden.
+    const outsider = await db.user.create({
+      data: {
+        name: 'Synthetic outsider',
+        email: `${randomUUID()}@synthetic.test`,
+        passwordHash: 'not-used',
+      },
+    });
+    const outsiderToken = app.get(JwtService).sign({
+      sub: outsider.id,
+      email: outsider.email,
+      tenantId: tenants[0],
+      tenantRole: null,
+      platformRole: null,
+    });
+    users.push(adminUser.id, outsider.id);
     const assign = (token: string, responsibleId: string) =>
       http()
         .put(`${base(campaign.id, prospect.id)}/responsible`)
@@ -484,6 +512,12 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
         responsible: { id: string; eligible: boolean };
       }>(response).data;
     try {
+      // A non-ADMIN without membership is rejected by the JWT strategy.
+      await http()
+        .put(`${base(campaign.id, prospect.id)}/responsible`)
+        .set('Authorization', `Bearer ${outsiderToken}`)
+        .send({ responsibleId: users[2] })
+        .expect(401);
       expect(responsibleOf(await assign(ownerA, users[2]))).toMatchObject({
         responsibleId: users[2],
         responsible: { id: users[2], eligible: true },
@@ -514,7 +548,7 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       ).toEqual([
         [null, users[2], users[0]],
         [users[2], users[0], users[2]],
-        [users[0], users[2], users[0]],
+        [users[0], users[2], adminUser.id],
       ]);
     } finally {
       await db.campaignActivity.deleteMany({
