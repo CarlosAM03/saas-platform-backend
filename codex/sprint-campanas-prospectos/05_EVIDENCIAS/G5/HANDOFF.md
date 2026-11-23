@@ -2,6 +2,10 @@
 
 **ESTADO: HANDOFF PROVISIONAL — NO LISTO_PARA_ANDRE**
 
+## Sincronización — 2026-11-23 (revisión final pre-aceptación)
+
+Revisión técnica final ejecutada por encargo del owner: sin hallazgos bloqueantes. Se resolvieron el fixture ADMIN de `AC-C4-01`, la reatribución de `AC-P4-04`, el estado intermedio de migraciones y drift documental del contrato. Quedan escaladas al owner las decisiones `G4-O4` y `G4-O5`, que afectan la representación del contrato para André. G5 se prepara tras la aceptación de G4. Evidencia en `../G4/REVISION_FINAL_G4_2026-11-23.md`. Sin push, merge, deploy ni ZIP de André.
+
 ## Sincronización — 2026-11-23 (cierre de brechas)
 
 HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Cobertura por AC: **50 `CUBIERTO` · 0 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`** según `../G4/MATRIZ_COBERTURA_AC.md`. `AC-P3-02` se cubre como lote revertido por rollback. Evidencia del bloque en `../G4/CIERRE_BRECHAS_AC_7A63DFB.md` y conclusión para el owner en `../G4/CONCLUSION_G4_7A63DFB.md`. Sin push, merge, deploy ni ZIP de André; `06_HANDOFF_ANDRE/` sigue sin generar hasta la aceptación de G4.

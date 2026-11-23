@@ -2,6 +2,10 @@
 
 **ESTADO: G4 NO CERRADO — CONCLUSIÓN TÉCNICA LISTA PARA REVISIÓN DEL OWNER**
 
+## Revisión técnica final (2026-11-23)
+
+Instrucción del owner: revisión de cobertura, fixtures de roles, aislamiento, migraciones y paridad contractual sobre el candidato exacto antes de aceptar G4. Resultado: **sin hallazgos bloqueantes**. Se resolvieron un hallazgo alto (fixture ADMIN no representativo en `AC-C4-01`) y cuatro medios (sobreafirmación de `AC-P4-04`, estado intermedio de migraciones, dependencia de orden y garantía estructural de `AC-C2-04`), más drift documental de contrato (`409` de `match`, `x-contract-status`, `SortBy` enum, `400/403`). Dos decisiones quedaron escaladas: `G4-O4` (clasificación de `CORRECTION`) y `G4-O5` (enum `MASTER_UPDATE`). Regresión sobre el árbol revisado: build PASS, 177 unitarias, 84 HTTP y **198 PostgreSQL** — **459 pruebas**. Detalle en `REVISION_FINAL_G4_2026-11-23.md` y `CONTRATO_REVISION_FINAL_0d1dd02.md`.
+
 ## Ejecución vigente — cierre de brechas por AC (2026-11-23)
 
 Tras la decisión del owner de no aceptar G4 con parciales, se añadieron doce pruebas dirigidas (`AC-C4-01`, `AC-C3-05`, `AC-P4-03`, `AC-P4-07`, `AC-C1-03`, `AC-C2-03`, `AC-C2-04`, `AC-C3-02`, `AC-C3-03`, `AC-C6-04`, `AC-P2-04`, `AC-P3-04`) y se reforzó `AC-P3-02` con el rollback del lote. Cadena completa ejecutada sobre el árbol limpio del SHA `0d1dd02` (pruebas en `30017d9`): build PASS, 177 unitarias, 84 HTTP y **196 PostgreSQL** — **457 pruebas** en 34 suites, 4 migraciones sin pendientes. Contraste por AC: **50 `CUBIERTO` · 0 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`**. Los bloques anteriores (445 y 442 pruebas) quedan como registro histórico. Detalle en `CIERRE_BRECHAS_AC_7A63DFB.md`.

@@ -2,6 +2,10 @@
 
 **ESTADO: PENDIENTE_OWNER**
 
+## Sincronización — 2026-11-23 (revisión final pre-aceptación)
+
+Revisión técnica final ejecutada por encargo del owner sobre el candidato exacto: **sin hallazgos bloqueantes**. Cobertura 50/50 AC; paridad contractual 25 ↔ 25 operaciones con Swagger servido `PARITY_OK`; aislamiento de tenant y migraciones sin hallazgos. Se resolvieron 1 alto y 4 medios; 2 decisiones (`G4-O4`, `G4-O5`) esperan al owner. G4 está listo para la decisión del owner; T32 sigue `NOT_RUN`. Detalle en `../G4/REVISION_FINAL_G4_2026-11-23.md` y `../G4/CONCLUSION_G4_7A63DFB.md`. Sin push, merge, deploy ni PR.
+
 ## Sincronización — 2026-11-23 (cierre de brechas)
 
 HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas y documentación. Se cerraron las brechas por AC: 50 `CUBIERTO` y 0 parciales, con `AC-P3-02` interpretado como lote revertido por rollback. La conclusión actualizada en `../G4/CONCLUSION_G4_7A63DFB.md` pide al owner aceptar G4, definir si requiere una reversión manual explícita y autorizar el commit del bloque. Este seguimiento no constituye aceptación; no hubo push, merge, deploy ni PR. T32 sigue `NOT_RUN`.

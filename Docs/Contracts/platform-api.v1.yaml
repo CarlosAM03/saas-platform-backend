@@ -283,7 +283,9 @@ paths:
       parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Search' }, { $ref: '#/components/parameters/SortBy' }, { $ref: '#/components/parameters/SortOrder' }]
       responses:
         '200': { $ref: '#/components/responses/CampaignPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Campaigns]
       summary: Crea una campaña en el tenant actual
@@ -384,6 +386,7 @@ paths:
         Fecha inválida, sin zona o rango invertido devuelve 400.
         Orden estable por sortBy/sortOrder y desempate por id ascendente.
       operationId: listCampaignProspects
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       parameters:
         - { $ref: '#/components/parameters/CampaignId' }
@@ -591,6 +594,7 @@ paths:
         cuando está excluido de candidates. Los errores conservan ErrorResponse;
         el 409 no garantiza un código de dominio ni candidatos en details.
       operationId: createProspect
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -624,7 +628,9 @@ paths:
       parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Search' }, { $ref: '#/components/parameters/SortBy' }, { $ref: '#/components/parameters/SortOrder' }]
       responses:
         '200': { $ref: '#/components/responses/ProspectPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /api/v1/prospects/import/preview:
     post:
       tags: [Prospects]
@@ -768,6 +774,7 @@ paths:
         Sin contexto usa la campaña de origen; con contexto B registra MASTER_UPDATED
         en B conservando origen A. Enviar sólo contextCampaignId devuelve 400.
       operationId: updateProspect
+      x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -792,7 +799,7 @@ paths:
     post:
       tags: [Prospects]
       summary: Busca coincidencias para una alta manual
-      description: Requiere ADMIN u OWNER y tenant seleccionado. strongProspect representa una identidad fuerte; candidates son coincidencias débiles por nombre.
+      description: Requiere ADMIN u OWNER y tenant seleccionado. strongProspect representa una identidad fuerte; candidates son coincidencias débiles por nombre. Devuelve 409 cuando varios maestros comparten la identidad fuerte o el hash almacenado choca con el identificador original.
       operationId: matchProspect
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -803,6 +810,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /api/v1/prospects/resolve:
     post:
       tags: [Prospects]
@@ -1018,7 +1026,7 @@ components:
       name: sortBy
       in: query
       required: false
-      schema: { type: string }
+      schema: { type: string, enum: [name, email, status, createdAt, updatedAt] }
     SortOrder:
       name: sortOrder
       in: query

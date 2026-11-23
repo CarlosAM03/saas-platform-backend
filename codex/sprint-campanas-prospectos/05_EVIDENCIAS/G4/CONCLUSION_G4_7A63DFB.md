@@ -15,13 +15,14 @@
 | Build | PASS, código 0 | §4 |
 | Unitarias | 12 suites, 177/177 PASS | §4 |
 | E2E HTTP | 7 suites, 84/84 PASS | §4 |
-| PostgreSQL 16 desechable | 15 suites, 196/196 PASS; 4 migraciones sin pendientes | §4 |
+| PostgreSQL 16 desechable | 15 suites, 198/198 PASS; 4 migraciones sin pendientes | §4 |
 | Rendimiento descriptivo | 4/4 casos; sin SLA | `CIERRE_LECTURA_7A63DFB.md` |
-| Paridad OpenAPI/Swagger CP | rutas CP presentes; `yamlOnly=[]` en la verificación previa | `MATRIZ_QA.md` (registros por SHA) |
+| Paridad OpenAPI/Swagger CP | 25 ↔ 25 operaciones; Swagger servido `PARITY_OK`; drift documental resuelto | `CONTRATO_REVISION_FINAL_0d1dd02.md` |
 | Sensibilidad de prueba de instantánea | rojo con implementación secuencial, verde con `RepeatableRead` | `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md` |
 | Cobertura por AC | 50 CUBIERTO · 0 CUBIERTO_PARCIAL · 0 NO_CUBIERTO | `MATRIZ_COBERTURA_AC.md` |
+| Revisión final | sin hallazgos bloqueantes; 1 alto y 4 medios resueltos; 2 decisiones escaladas | `REVISION_FINAL_G4_2026-11-23.md` |
 
-Total funcional de la última corrida: **457 pruebas** en 34 suites (177 unitarias + 84 HTTP + 196 PostgreSQL).
+Total funcional de la última corrida: **459 pruebas** en 34 suites (177 unitarias + 84 HTTP + 198 PostgreSQL).
 
 ## 2. Qué quedó cubierto por criterio
 
@@ -59,8 +60,10 @@ docker compose --profile test run --build --rm test-postgres sh -c "npm run test
 
 ## 6. Decisión solicitada al owner
 
-1. ¿Acepta G4 con los 50 AC cubiertos y el criterio de «revertir» interpretado como rollback del lote?
-2. ¿Requiere una operación de reversión manual explícita antes de G5, o acepta el rechazo seguro y el rollback como cobertura suficiente?
-3. ¿Autoriza el commit de pruebas y documentación de este bloque en `feat/sprint-campana-prospector`?
+El owner ya ratificó que `AC-P3-02` cubre operaciones revertidas mediante rollback y no exige reversión manual. La revisión final no encontró bloqueos. Quedan tres decisiones:
 
-Este documento no cierra G4, no autoriza merge y no declara terminado el sprint. G5 sigue provisional; G6 depende de la revisión del owner.
+1. **Aceptación de G4:** ¿acepta G4 con los 50 AC cubiertos y la revisión final sin bloqueos?
+2. **G4-O4 — clasificación de `CORRECTION`:** hoy cuenta como evento automático (`activity.events`) y el contrato lo declara así; el SPEC §4.C3 distingue declaración manual. Opciones: (A) mantener y ratificar; (B) contar como actividad manual con ajuste de contrato y dashboard; (C) tercer contador `corrections`. Afecta el contrato que consumirá André.
+3. **G4-O5 — enum `MASTER_UPDATE`:** presente en Prisma, ausente del YAML. Opciones: (A) ampliar el enum del YAML; (B) eliminarlo de Prisma (migración); (C) documentar la latencia. La API no escribe ese tipo hoy.
+
+Este documento no cierra G4, no autoriza merge y no declara terminado el sprint. G5 sigue provisional; G6 depende de la revisión del owner. Tras la aceptación de G4, se prepara G5; T32 permanece `NOT_RUN` y corresponde al frontend.
