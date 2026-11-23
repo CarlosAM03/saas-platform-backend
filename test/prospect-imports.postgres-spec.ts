@@ -105,7 +105,7 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
       2,
     );
   });
-  it('rolls back earlier real writes when a later infrastructure error occurs', async () => {
+  it('AC-P3-02 rolls back a reverted batch without leaving durable provenance', async () => {
     await run(async () => {
       const preview = await service.preview(campaignId, file);
       let writes = 0;
@@ -136,6 +136,13 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
       expect(
         await prisma.campaignProspect.count({ where: { campaignId } }),
       ).toBe(0);
+      // A reverted batch must not leave provenance or commercial activity.
+      expect(
+        await prisma.prospectProvenance.count({ where: { tenantId } }),
+      ).toBe(0);
+      expect(await prisma.campaignActivity.count({ where: { tenantId } })).toBe(
+        0,
+      );
     });
   });
   it('RI06 CSV creates a distinct master consciously and preserves the weak candidate', async () => {
