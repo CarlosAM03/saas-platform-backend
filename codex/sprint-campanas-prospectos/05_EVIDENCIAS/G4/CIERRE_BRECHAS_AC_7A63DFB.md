@@ -25,10 +25,11 @@ Reducir la cobertura parcial sin inflar estados: cada AC debía pasar a `CUBIERT
 | `AC-C6-04` | Sin caso de volumen | `AC-C6-04 filters and paginates hundreds of participations server-side` | 300 participaciones, 25 por página, filtro con total 100. |
 | `AC-P2-04` | Sin comparación de roles en P2 | `AC-P2-04 serves P2 to OWNER and MEMBER under existing rights and hides foreign masters` | Payload idéntico entre roles y 404 para maestro ajeno. |
 | `AC-P3-04` | Sin verificación fecha por fecha | `AC-P3-04 returns only provenance rows backed by the database` | Cada fecha, tipo y campaña coincide con la fila almacenada. |
+| `AC-P3-02` | Preview y omisión cubiertos; «revertir» sin ejercicio | `AC-P3-02 rolls back a reverted batch without leaving durable provenance` | El lote con fallo inyectado revierte y deja 0 procedencias y 0 actividades. |
 
-## 3. Brecha que no se cierra por diseño
+## 3. Brecha que exige interpretación, no implementación
 
-`AC-P3-02` menciona «preview/omitir/**revertir**». La API no expone operación de reversión y el contrato no la declara; preview, omisión y rechazo sí están cubiertos sin escrituras. Se mantiene `CUBIERTO_PARCIAL` y se registra como límite de alcance que requiere decisión del owner si el SPEC exige revertir. No se implementó un verbo nuevo porque sería una funcionalidad inexistente en el perímetro.
+`AC-P3-02` menciona «preview/omitir/**revertir**». La API no expone un verbo de reversión manual y el contrato no lo declara. El criterio se cubre como **lote revertido por rollback**: la prueba inyecta un fallo en la segunda escritura y verifica 0 maestros, 0 participaciones, 0 eventos de procedencia y 0 actividades. Preview, omisión y rechazo también se verifican sin escrituras. Si el owner espera una operación de reversión explícita, es funcionalidad nueva y queda fuera de este bloque.
 
 ## 4. Dos defectos de prueba detectados y corregidos durante el bloque
 
@@ -56,7 +57,7 @@ Total funcional: **457 pruebas** (177 + 84 + 196).
 
 ## 6. Efecto en la matriz
 
-`MATRIZ_COBERTURA_AC.md` pasa de 37 `CUBIERTO` / 13 `CUBIERTO_PARCIAL` a **49 `CUBIERTO` / 1 `CUBIERTO_PARCIAL` / 0 `NO_CUBIERTO`**.
+`MATRIZ_COBERTURA_AC.md` pasa de 37 `CUBIERTO` / 13 `CUBIERTO_PARCIAL` a **50 `CUBIERTO` / 0 `CUBIERTO_PARCIAL` / 0 `NO_CUBIERTO`**.
 
 ## 7. Limitaciones
 

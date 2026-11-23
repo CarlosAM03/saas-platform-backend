@@ -19,7 +19,7 @@
 | Rendimiento descriptivo | 4/4 casos; sin SLA | `CIERRE_LECTURA_7A63DFB.md` |
 | Paridad OpenAPI/Swagger CP | rutas CP presentes; `yamlOnly=[]` en la verificación previa | `MATRIZ_QA.md` (registros por SHA) |
 | Sensibilidad de prueba de instantánea | rojo con implementación secuencial, verde con `RepeatableRead` | `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md` |
-| Cobertura por AC | 49 CUBIERTO · 1 CUBIERTO_PARCIAL · 0 NO_CUBIERTO | `MATRIZ_COBERTURA_AC.md` |
+| Cobertura por AC | 50 CUBIERTO · 0 CUBIERTO_PARCIAL · 0 NO_CUBIERTO | `MATRIZ_COBERTURA_AC.md` |
 
 Total funcional de la última corrida: **457 pruebas** en 34 suites (177 unitarias + 84 HTTP + 196 PostgreSQL).
 
@@ -29,8 +29,8 @@ Los 50 AC del SPEC tienen al menos una aserción asociada y los 49 `CUBIERTO` in
 
 ## 3. Brechas que el owner debe conocer antes de aceptar
 
-1. **1 AC parcial: `AC-P3-02`.** El SPEC menciona «preview/omitir/revertir». Preview, omisión y rechazo están cubiertos sin escrituras; **la API no expone operación de reversión** y el contrato no la declara. La brecha es de alcance funcional, no de prueba: se requiere decisión del owner sobre si el sprint debe incluirla o si basta el rechazo seguro actual.
-2. **Pruebas parciales no equivalen a comportamiento ausente.** Varias brechas históricas eran de representación o contrato, no de implementación.
+1. **Cobertura completa con un punto interpretativo.** Los 50 AC tienen aserción directa. `AC-P3-02` menciona «revertir»: se cubrió como lote revertido por rollback (0 procedencias y 0 actividades tras un fallo inyectado), porque la API no expone un verbo de reversión manual. Si el owner espera esa operación, es funcionalidad nueva y debe decidirse antes de G5; no se declara implementada.
+2. **Las brechas históricas eran de prueba o evidencia, no de implementación.** Se cerraron con aserciones directas sin tocar `src/`.
 3. **T32 `NOT_RUN`.** Es E2E Flutter y no puede declararse desde el backend.
 4. **Rendimiento.** Las mediciones son descriptivas sobre datos sintéticos (5 000 participaciones), sin SLA ni equivalencia productiva.
 5. **Doble HTTP en memoria.** La regresión E2E usa dobles fieles a `select`/`where` anidados, pero no sustituye PostgreSQL para reglas de dominio.
@@ -59,8 +59,8 @@ docker compose --profile test run --build --rm test-postgres sh -c "npm run test
 
 ## 6. Decisión solicitada al owner
 
-1. ¿Acepta G4 con 49 AC cubiertos y `AC-P3-02` parcial por ausencia de operación de reversión en el contrato?
-2. ¿Exige implementar o documentar formalmente una operación de reversión antes de G5, o acepta que el rechazo seguro actual cubre el criterio?
+1. ¿Acepta G4 con los 50 AC cubiertos y el criterio de «revertir» interpretado como rollback del lote?
+2. ¿Requiere una operación de reversión manual explícita antes de G5, o acepta el rechazo seguro y el rollback como cobertura suficiente?
 3. ¿Autoriza el commit de pruebas y documentación de este bloque en `feat/sprint-campana-prospector`?
 
 Este documento no cierra G4, no autoriza merge y no declara terminado el sprint. G5 sigue provisional; G6 depende de la revisión del owner.

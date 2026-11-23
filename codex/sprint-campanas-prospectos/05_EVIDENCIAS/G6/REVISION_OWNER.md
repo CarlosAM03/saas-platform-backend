@@ -4,7 +4,7 @@
 
 ## Sincronización — 2026-11-23 (cierre de brechas)
 
-HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas y documentación. Se cerraron las brechas por AC: 49 `CUBIERTO` y 1 `CUBIERTO_PARCIAL` (`AC-P3-02`, sin operación de reversión en el contrato). La conclusión actualizada en `../G4/CONCLUSION_G4_7A63DFB.md` pide al owner tres decisiones: aceptar G4 con esa única parcial, definir si se exige reversión antes de G5 y autorizar el commit del bloque. Este seguimiento no constituye aceptación; no hubo push, merge, deploy ni PR. T32 sigue `NOT_RUN`.
+HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas y documentación. Se cerraron las brechas por AC: 50 `CUBIERTO` y 0 parciales, con `AC-P3-02` interpretado como lote revertido por rollback. La conclusión actualizada en `../G4/CONCLUSION_G4_7A63DFB.md` pide al owner aceptar G4, definir si requiere una reversión manual explícita y autorizar el commit del bloque. Este seguimiento no constituye aceptación; no hubo push, merge, deploy ni PR. T32 sigue `NOT_RUN`.
 
 ## Sincronización — 2026-11-23
 

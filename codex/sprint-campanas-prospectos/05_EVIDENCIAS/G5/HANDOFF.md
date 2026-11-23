@@ -4,7 +4,7 @@
 
 ## Sincronización — 2026-11-23 (cierre de brechas)
 
-HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Cobertura por AC: **49 `CUBIERTO` · 1 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`** según `../G4/MATRIZ_COBERTURA_AC.md`. La única parcial es `AC-P3-02` por ausencia de operación de reversión en el contrato. Evidencia del bloque en `../G4/CIERRE_BRECHAS_AC_7A63DFB.md` y conclusión para el owner en `../G4/CONCLUSION_G4_7A63DFB.md`. Sin push, merge, deploy ni ZIP de André; `06_HANDOFF_ANDRE/` sigue sin generar hasta la aceptación de G4.
+HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Cobertura por AC: **50 `CUBIERTO` · 0 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`** según `../G4/MATRIZ_COBERTURA_AC.md`. `AC-P3-02` se cubre como lote revertido por rollback. Evidencia del bloque en `../G4/CIERRE_BRECHAS_AC_7A63DFB.md` y conclusión para el owner en `../G4/CONCLUSION_G4_7A63DFB.md`. Sin push, merge, deploy ni ZIP de André; `06_HANDOFF_ANDRE/` sigue sin generar hasta la aceptación de G4.
 
 ## Sincronización — 2026-11-23
 
