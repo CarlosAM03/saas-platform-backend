@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "codex/sprint-campanas-prospectos/01_GOBIERNO/01_AUTORIDAD_PRECEDENCIA.md",
+    "codex/sprint-campanas-prospectos/01_GOBIERNO/02_ALCANCE_Y_LIMITES.md",
+    "codex/sprint-campanas-prospectos/01_GOBIERNO/03_RAMAS_G0.md",
+    "codex/sprint-campanas-prospectos/02_EJECUCION/06_SUBAGENTES.md"
+  ],
+  "permissions": [
+    { "action": "shell", "resource": "git push *", "effect": "deny" },
+    { "action": "shell", "resource": "git reset *", "effect": "ask" },
+    { "action": "shell", "resource": "*down -v*", "effect": "deny" },
+    { "action": "shell", "resource": "*prisma migrate deploy*", "effect": "deny" }
+  ]
+}
