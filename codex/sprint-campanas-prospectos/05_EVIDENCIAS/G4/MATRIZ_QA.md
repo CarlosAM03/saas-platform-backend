@@ -1,6 +1,6 @@
 # G4 — QA por SHA y rastreabilidad
 
-**ESTADO: G4 NO CERRADO — CONCLUSIÓN TÉCNICA LISTA PARA REVISIÓN DEL OWNER**
+**ESTADO: `G4 ACEPTADO POR EL OWNER` (2026-11-23) sobre `3b5eec6fa99f846e853794fc8aedff2c4353c269`; `G5 LISTO_PARA_REVISION`; G6 pendiente de la revisión del owner.** Ver `ACEPTACION_G4_OWNER.md` y `../G5/HANDOFF.md`.
 
 ## Bloque O4-B / O5-A — dashboard y paridad del enum (2026-11-23)
 

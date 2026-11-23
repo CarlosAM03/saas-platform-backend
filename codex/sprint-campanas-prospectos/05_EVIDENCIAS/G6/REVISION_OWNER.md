@@ -2,6 +2,10 @@
 
 **ESTADO: PENDIENTE_OWNER**
 
+## Sincronización — 2026-11-23 (G4 aceptado; G5 preparado)
+
+El owner aceptó G4 sobre `3b5eec6fa99f846e853794fc8aedff2c4353c269` y autorizó preparar el handoff contractual sin push, merge, deploy ni migraciones remotas. G5 quedó en `LISTO_PARA_REVISION` con el arnés en `06_HANDOFF_ANDRE/`; el owner decide su uso y la base Flutter. G6 continúa pendiente: la aceptación de G4 no equivale a aprobación del PR. Evidencia: `../G4/ACEPTACION_G4_OWNER.md`, `../G5/HANDOFF.md`.
+
 ## Sincronización — 2026-11-23 (O4-B / O5-A aplicadas)
 
 Las dos decisiones escaladas quedaron resueltas por el owner y aplicadas en `3b5eec6fa99f846e853794fc8aedff2c4353c269`: `CORRECTION` como actividad manual (`G4-O4-B`) y `MASTER_UPDATE` en el enum de respuesta del contrato (`G4-O5-A`). El candidato se verificó en árbol limpio: 178 unitarias, 84 HTTP y 199 PostgreSQL (461 pruebas), Swagger servido con las tres comprobaciones de actividad y arnés íntegro. G4 se presenta para aceptación; este seguimiento no constituye aceptación. No hubo push, merge, deploy ni PR. Evidencia en `../G4/BLOQUE_O4_O5_3B5EEC6.md` y `../G4/CONCLUSION_G4_3B5EEC6.md`.
