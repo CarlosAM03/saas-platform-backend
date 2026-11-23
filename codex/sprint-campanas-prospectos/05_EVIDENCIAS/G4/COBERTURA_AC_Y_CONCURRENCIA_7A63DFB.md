@@ -61,7 +61,7 @@ Los 13 criterios parciales conservan su brecha declarada; destacan por impacto: 
 
 ### Verificación posterior al commit
 
-Tras crear los commits `a5055b5` (pruebas) y `d42be1c` (documentación), se repitió la cadena completa sobre el árbol consolidado en `d42be1c27be192f0bca8ab36aabaacedc1c00518`: build código 0, 177 unitarias, 84 HTTP, 181 PostgreSQL y 4 migraciones sin pendientes. Posteriormente se añadieron las tres pruebas de parciales y se ejecutó la cadena final: build código 0, 177 unitarias, 84 HTTP, **184 PostgreSQL**, total **445**. Las cifras de la tabla anterior corresponden a esa última corrida.
+Tras crear los commits `a5055b5` (pruebas) y `d42be1c` (documentación), se repitió la cadena completa sobre el árbol consolidado en `d42be1c27be192f0bca8ab36aabaacedc1c00518`: build código 0, 177 unitarias, 84 HTTP, 181 PostgreSQL y 4 migraciones sin pendientes. Después se añadieron las tres pruebas de parciales; la cadena final sobre el árbol de trabajo y, de nuevo, sobre el SHA consolidado `9b6017b33383535d05cc72d86e28363241cb7590` dio build código 0, 177 unitarias, 84 HTTP y **184 PostgreSQL**, total **445**, con 4 migraciones sin pendientes en ambas ejecuciones. Las cifras de la tabla anterior corresponden a la corrida sobre `9b6017b`.
 
 ## 6. Limitaciones y riesgos residuales
 

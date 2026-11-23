@@ -4,7 +4,7 @@
 
 ## Ejecución vigente — pruebas de cobertura AC y sensibilidad de instantánea (2026-11-23)
 
-Cierre de parciales y verificación post-commit: además del bloque inicial, se añadieron pruebas para `AC-C2-01`, `AC-C4-02` y `AC-C8-04`. La cadena completa se ejecutó de nuevo sobre el árbol de trabajo consolidado y dio build PASS, 177 unitarias, 84 HTTP y **184 PostgreSQL** — **445 pruebas** en 34 suites, 4 migraciones sin pendientes. Antes, la misma cadena sobre el commit documental `d42be1c27be192f0bca8ab36aabaacedc1c00518` dio 181 PostgreSQL (442 pruebas). Contraste por AC: **37 `CUBIERTO` · 13 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`** en `MATRIZ_COBERTURA_AC.md`.
+Cierre de parciales y verificación post-commit: además del bloque inicial, se añadieron pruebas para `AC-C2-01`, `AC-C4-02` y `AC-C8-04`. La cadena completa se ejecutó de nuevo sobre el árbol de trabajo consolidado y dio build PASS, 177 unitarias, 84 HTTP y **184 PostgreSQL** — **445 pruebas** en 34 suites, 4 migraciones sin pendientes. Esa misma cadena se repitió después sobre el SHA consolidado `9b6017b33383535d05cc72d86e28363241cb7590`, con resultado idéntico: 177/84/184 y 4 migraciones sin pendientes. Antes, sobre el commit documental `d42be1c27be192f0bca8ab36aabaacedc1c00518`, la cadena dio 181 PostgreSQL (442 pruebas). Contraste por AC: **37 `CUBIERTO` · 13 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`** en `MATRIZ_COBERTURA_AC.md`.
 
 HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` **+ worktree modificado** en `test/campaigns-read-capabilities.postgres-spec.ts` y `test/prospect-read-capabilities.postgres-spec.ts`. Detalle completo en `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`; conclusión para el owner en `CONCLUSION_G4_7A63DFB.md`.
 

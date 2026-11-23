@@ -100,7 +100,7 @@ Ninguna fila se marca `PASS`.
 Hechos observados por el integrador durante este bloque. La matriz no reejecutó nada por su cuenta.
 
 - Fecha de la corrida: `2026-11-23`.
-- HEAD: `7a63dfbe1d72b695457cf99b830f186af9b3d2bb`.
+- HEAD de la ejecución: `9b6017b33383535d05cc72d86e28363241cb7590` (código y pruebas); HEAD de código base del sprint `7a63dfbe1d72b695457cf99b830f186af9b3d2bb`.
 - Build: `npm run build` — código 0 (PASS).
 - Unitarias: `npm run test:unit:ci` — 12 suites, **177/177** (PASS).
 - E2E HTTP: `npm run test:e2e:ci` — 7 suites, **84/84** (PASS).
@@ -109,6 +109,6 @@ Hechos observados por el integrador durante este bloque. La matriz no reejecutó
 - Sensibilidad de la prueba de instantánea: reproducción roja controlada con el dashboard secuencial (`Expected: 2`, `Received: 3` en `activity.events`) y verde con `RepeatableRead`. Detalle en `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`.
 - Lint/Formato: `npx eslint` y `npx prettier --check` sobre los dos archivos de prueba modificados — código 0.
 - Conteo de esta matriz: **37 `CUBIERTO` · 13 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`** de 50 criterios.
-- Condición del árbol: **worktree modificado** en `test/campaigns-read-capabilities.postgres-spec.ts` y `test/prospect-read-capabilities.postgres-spec.ts` respecto del commit, con aserciones exactas, prueba determinista de instantánea y las cinco pruebas de AC añadidas.
-- Los resultados anteriores **no** se atribuyen al commit aislado: corresponden a HEAD + worktree modificado.
+- Condición del árbol al ejecutar: **árbol limpio** en el SHA consolidado `9b6017b33383535d05cc72d86e28363241cb7590`; la cadena también se ejecutó antes sobre el worktree previo al commit con resultado idéntico.
+- Los resultados se atribuyen al SHA `9b6017b` para código y pruebas; los cambios posteriores son exclusivamente documentales.
 - Sin `git push`, merge, deploy ni migración remota. `03_CALIDAD/MATRIZ_AC_Y_TESTS.md` no fue modificado.
