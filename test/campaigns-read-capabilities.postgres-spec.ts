@@ -477,6 +477,116 @@ describe('Campaign read capabilities on disposable PostgreSQL', () => {
     expect(stored.content).toBe('Called the business, no answer');
   });
 
+  it('AC-C2-01 rejects NO_APTO without a reason and mutates nothing', async () => {
+    const prospectId = prospectIds[0];
+    const participation = () =>
+      db.campaignProspect.findUniqueOrThrow({
+        where: { campaignId_prospectId: { campaignId, prospectId } },
+      });
+    const before = await participation();
+    const activitiesBefore = await db.campaignActivity.count({
+      where: { tenantId, campaignId, prospectId },
+    });
+    for (const reason of [undefined, '', '   ']) {
+      await expect(
+        run(() =>
+          svc.updateEvaluation(campaignId, prospectId, 'NO_APTO', reason),
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(await participation()).toEqual(before);
+    expect(
+      await db.campaignActivity.count({
+        where: { tenantId, campaignId, prospectId },
+      }),
+    ).toBe(activitiesBefore);
+  });
+
+  it('AC-C4-02 rejects inactive or non-member responsibles without any write', async () => {
+    const prospectId = prospectIds[0];
+    const active = await run(() =>
+      svc.assignResponsible(campaignId, prospectId, responsibleId),
+    );
+    expect(active.responsibleId).toBe(responsibleId);
+    const snapshot = async () => ({
+      row: await db.campaignProspect.findUniqueOrThrow({
+        where: { campaignId_prospectId: { campaignId, prospectId } },
+      }),
+      activities: await db.campaignActivity.count({
+        where: { tenantId, campaignId, prospectId },
+      }),
+    });
+    const before = await snapshot();
+
+    // Same tenant, no membership.
+    const outsider = await db.user.create({
+      data: {
+        name: 'Synthetic outsider',
+        email: `${randomUUID()}@synthetic.test`,
+        passwordHash: 'unused',
+      },
+    });
+    await expect(
+      run(() => svc.assignResponsible(campaignId, prospectId, outsider.id)),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    // Member, but inactive.
+    await db.user.update({
+      where: { id: actor },
+      data: { status: 'INACTIVO' },
+    });
+    await expect(
+      run(() => svc.assignResponsible(campaignId, prospectId, actor)),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(await snapshot()).toEqual(before);
+    await db.user.update({ where: { id: actor }, data: { status: 'ACTIVO' } });
+    await db.user.delete({ where: { id: outsider.id } });
+  });
+
+  it('AC-C8-04 answers a coherent empty dashboard without NaN or negatives', async () => {
+    const empty = await db.campaign.create({
+      data: { tenantId, createdBy: actor, name: 'Empty campaign' },
+    });
+    const result = await run(() => svc.dashboard(empty.id));
+    expect(result).toMatchObject({
+      total: 0,
+      stages: {
+        SIN_GESTIONAR: 0,
+        EN_INVESTIGACION: 0,
+        CONTACTADO: 0,
+        EN_SEGUIMIENTO: 0,
+        OPORTUNIDAD: 0,
+        CERRADO: 0,
+      },
+      evaluations: { SIN_EVALUAR: 0, APTO: 0, NO_APTO: 0 },
+      responsibility: {},
+      incorporation: { new: 0, reused: 0, unknownLegacy: 0 },
+      activity: { total: 0, manual: 0, events: 0 },
+    });
+    const numbers = [
+      result.total,
+      ...Object.values(result.stages),
+      ...Object.values(result.evaluations),
+      ...Object.values(result.responsibility),
+      ...Object.values(result.incorporation),
+      result.activity.total,
+      result.activity.manual,
+      result.activity.events,
+    ];
+    expect(numbers.every((value) => Number.isFinite(value))).toBe(true);
+    expect(numbers.some((value) => value < 0)).toBe(false);
+    // Reading an empty campaign writes nothing.
+    expect(
+      await db.campaignActivity.count({
+        where: { tenantId, campaignId: empty.id },
+      }),
+    ).toBe(0);
+    expect(
+      await db.campaignProspect.count({ where: { campaignId: empty.id } }),
+    ).toBe(0);
+  });
+
   it.each(['membership', 'inactive'])(
     'computes eligibility after %s loss without rewriting assignment/history',
     async (loss) => {
