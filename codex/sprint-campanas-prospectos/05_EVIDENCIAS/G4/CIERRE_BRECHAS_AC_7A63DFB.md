@@ -40,6 +40,8 @@ Ambos casos se conservan aquí como evidencia de que una prueba verde puede medi
 
 ## 5. Ejecución
 
+Ejecutada sobre el árbol limpio del SHA `0d1dd02` (pruebas en `30017d9`).
+
 ```text
 docker compose --profile test run --build --rm test-postgres sh -c "npm run build && npm run test:unit:ci && npm run test:e2e:ci && npm run prisma:migrate:deploy && npm run test:postgres"
 ```

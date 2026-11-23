@@ -4,7 +4,7 @@
 
 - Fecha: `2026-11-23`.
 - HEAD de código: `7a63dfbe1d72b695457cf99b830f186af9b3d2bb`, rama `feat/sprint-campana-prospector`.
-- Commits del bloque: `a5055b5` (pruebas) y `d42be1c` (documentación), más el segundo bloque de pruebas y documentación registrado después de esta conclusión.
+- Commits del bloque: `a5055b5`, `d42be1c`, `1f3e2d5`, `9b6017b`, `e4348f3`, `25feccd`, `63183c2`, `30017d9` y `0d1dd02`. La ejecución vigente corresponde al árbol limpio de `0d1dd02`.
 - Estado del árbol al emitir esta conclusión: worktree con pruebas y documentación adicionales sin commit. Ningún cambio en `src/`, `Prisma/` ni migraciones.
 - Autoridad funcional: `04_REFERENCIAS/SPEC_SPRINT_CAMPANAS_PROSPECTOS_v1.0_OWNER_APROBADO.md` (A1–E5, INV-01..12, AC, gates).
 

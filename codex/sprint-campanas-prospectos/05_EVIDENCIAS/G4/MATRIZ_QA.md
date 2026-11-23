@@ -4,7 +4,7 @@
 
 ## Ejecución vigente — cierre de brechas por AC (2026-11-23)
 
-Tras la decisión del owner de no aceptar G4 con parciales, se añadieron doce pruebas dirigidas (`AC-C4-01`, `AC-C3-05`, `AC-P4-03`, `AC-P4-07`, `AC-C1-03`, `AC-C2-03`, `AC-C2-04`, `AC-C3-02`, `AC-C3-03`, `AC-C6-04`, `AC-P2-04`, `AC-P3-04`) y se reforzó `AC-P3-02` con el rollback del lote. Cadena completa: build PASS, 177 unitarias, 84 HTTP y **196 PostgreSQL** — **457 pruebas** en 34 suites, 4 migraciones sin pendientes. Contraste por AC: **50 `CUBIERTO` · 0 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`**. El bloque anterior (445 pruebas) queda como registro histórico. Detalle en `CIERRE_BRECHAS_AC_7A63DFB.md`.
+Tras la decisión del owner de no aceptar G4 con parciales, se añadieron doce pruebas dirigidas (`AC-C4-01`, `AC-C3-05`, `AC-P4-03`, `AC-P4-07`, `AC-C1-03`, `AC-C2-03`, `AC-C2-04`, `AC-C3-02`, `AC-C3-03`, `AC-C6-04`, `AC-P2-04`, `AC-P3-04`) y se reforzó `AC-P3-02` con el rollback del lote. Cadena completa ejecutada sobre el árbol limpio del SHA `0d1dd02` (pruebas en `30017d9`): build PASS, 177 unitarias, 84 HTTP y **196 PostgreSQL** — **457 pruebas** en 34 suites, 4 migraciones sin pendientes. Contraste por AC: **50 `CUBIERTO` · 0 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO`**. Los bloques anteriores (445 y 442 pruebas) quedan como registro histórico. Detalle en `CIERRE_BRECHAS_AC_7A63DFB.md`.
 
 HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` **+ worktree modificado** en `test/campaigns-read-capabilities.postgres-spec.ts`, `test/campaigns-tenant-isolation.postgres-spec.ts`, `test/prospect-read-capabilities.postgres-spec.ts` y `test/prospect-imports.postgres-spec.ts`. Detalle completo en `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`; conclusión para el owner en `CONCLUSION_G4_7A63DFB.md`.
 
