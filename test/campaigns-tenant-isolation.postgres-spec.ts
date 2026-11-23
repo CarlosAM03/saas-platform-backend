@@ -363,14 +363,29 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
 
   it('P2 HTTP preserves the associated-campaign object and adds pagination and contextual activity', async () => {
     const before = await snapshot();
-    const response = await http().get(`/api/v1/prospects/${prospects[0]}/campaigns`)
-      .set('Authorization', `Bearer ${ownerA}`).query({ page: 1, limit: 1 }).expect(200);
-    expect(response.body as unknown).toMatchObject({ success: true, data: {
-      originCampaignId: campaigns[0],
-      meta: { page: 1, limit: 1, total: 1, totalPages: 1 },
-      campaigns: [{ campaign: { id: campaigns[0] }, isOrigin: true, responsible: null,
-        latestActivity: { type: 'NOTE', content: 'Synthetic contextual note' } }],
-    } });
+    const response = await http()
+      .get(`/api/v1/prospects/${prospects[0]}/campaigns`)
+      .set('Authorization', `Bearer ${ownerA}`)
+      .query({ page: 1, limit: 1 })
+      .expect(200);
+    expect(response.body as unknown).toMatchObject({
+      success: true,
+      data: {
+        originCampaignId: campaigns[0],
+        meta: { page: 1, limit: 1, total: 1, totalPages: 1 },
+        campaigns: [
+          {
+            campaign: { id: campaigns[0] },
+            isOrigin: true,
+            responsible: null,
+            latestActivity: {
+              type: 'NOTE',
+              content: 'Synthetic contextual note',
+            },
+          },
+        ],
+      },
+    });
     expect(JSON.stringify(response.body)).not.toContain(prospects[1]);
     expect(await snapshot()).toEqual(before);
   });
@@ -379,18 +394,26 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
     { contextCampaignId: null, phone: '000' },
     { contextCampaignId: '   ', phone: '000' },
     { contextCampaignId: 'valid-but-context-only' },
-  ])('PATCH HTTP rejects invalid/context-only requests without writes: %j', async (requestBody) => {
-    const before = await snapshot();
-    await http().patch(`/api/v1/prospects/${prospects[0]}`)
-      .set('Authorization', `Bearer ${ownerA}`).send(requestBody).expect(400);
-    expect(await snapshot()).toEqual(before);
-  });
+  ])(
+    'PATCH HTTP rejects invalid/context-only requests without writes: %j',
+    async (requestBody) => {
+      const before = await snapshot();
+      await http()
+        .patch(`/api/v1/prospects/${prospects[0]}`)
+        .set('Authorization', `Bearer ${ownerA}`)
+        .send(requestBody)
+        .expect(400);
+      expect(await snapshot()).toEqual(before);
+    },
+  );
 
   it('PATCH HTTP hides a foreign contextual campaign without writing master or history', async () => {
     const before = await snapshot();
-    await http().patch(`/api/v1/prospects/${prospects[0]}`)
+    await http()
+      .patch(`/api/v1/prospects/${prospects[0]}`)
       .set('Authorization', `Bearer ${ownerA}`)
-      .send({ phone: '000', contextCampaignId: campaigns[1] }).expect(404);
+      .send({ phone: '000', contextCampaignId: campaigns[1] })
+      .expect(404);
     expect(await snapshot()).toEqual(before);
   });
 
@@ -419,6 +442,124 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       payload.error.details.candidates.map((candidate) => candidate.id),
     ).toEqual([prospects[0]]);
     expect(await snapshot()).toEqual(before);
+  });
+
+  it('AC-C4-01 lets OWNER, MEMBER and a tenant-selected ADMIN assign an eligible responsible', async () => {
+    // Dedicated fixture: this spec shares state across cases.
+    const campaign = await db.campaign.create({
+      data: {
+        tenantId: tenants[0],
+        createdBy: users[0],
+        name: 'Roles campaign',
+      },
+    });
+    const prospect = await db.prospect.create({
+      data: {
+        tenantId: tenants[0],
+        campaignId: campaign.id,
+        name: 'Roles prospect',
+        source: 'manual',
+      },
+    });
+    await db.campaignProspect.create({
+      data: { campaignId: campaign.id, prospectId: prospect.id },
+    });
+    const admin = await db.user.findUniqueOrThrow({ where: { id: users[0] } });
+    const adminToken = app.get(JwtService).sign({
+      sub: admin.id,
+      email: admin.email,
+      tenantId: tenants[0],
+      tenantRole: null,
+      platformRole: 'ADMIN',
+    });
+    const assign = (token: string, responsibleId: string) =>
+      http()
+        .put(`${base(campaign.id, prospect.id)}/responsible`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ responsibleId })
+        .expect(200);
+    const responsibleOf = (response: { body: unknown }) =>
+      body<{
+        responsibleId: string;
+        responsible: { id: string; eligible: boolean };
+      }>(response).data;
+    try {
+      expect(responsibleOf(await assign(ownerA, users[2]))).toMatchObject({
+        responsibleId: users[2],
+        responsible: { id: users[2], eligible: true },
+      });
+      expect(responsibleOf(await assign(memberA, users[0]))).toMatchObject({
+        responsibleId: users[0],
+        responsible: { id: users[0], eligible: true },
+      });
+      expect(responsibleOf(await assign(adminToken, users[2]))).toMatchObject({
+        responsibleId: users[2],
+        responsible: { id: users[2], eligible: true },
+      });
+      const events = await db.campaignActivity.findMany({
+        where: {
+          tenantId: tenants[0],
+          campaignId: campaign.id,
+          prospectId: prospect.id,
+          type: 'RESPONSIBLE_CHANGE',
+        },
+        orderBy: { id: 'asc' },
+      });
+      expect(
+        events.map((event) => [
+          event.previousValue,
+          event.newValue,
+          event.actorUserId,
+        ]),
+      ).toEqual([
+        [null, users[2], users[0]],
+        [users[2], users[0], users[2]],
+        [users[0], users[2], users[0]],
+      ]);
+    } finally {
+      await db.campaignActivity.deleteMany({
+        where: { tenantId: tenants[0], campaignId: campaign.id },
+      });
+      await db.campaignProspect.deleteMany({
+        where: { campaignId: campaign.id },
+      });
+      await db.prospect.delete({
+        where: { id: prospect.id, tenantId: tenants[0] },
+      });
+      await db.campaign.delete({ where: { id: campaign.id } });
+    }
+  });
+
+  it('AC-P2-04 serves P2 to OWNER and MEMBER under existing rights and hides foreign masters', async () => {
+    const url = (id: string) => `/api/v1/prospects/${id}/campaigns`;
+    const ownerView = await http()
+      .get(url(prospects[0]))
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(200);
+    const memberView = await http()
+      .get(url(prospects[0]))
+      .set('Authorization', `Bearer ${memberA}`)
+      .expect(200);
+    type P2Body = {
+      originCampaignId: string;
+      campaigns: Array<{ campaign: { id: string }; isOrigin: boolean }>;
+    };
+    const ownerData = body<P2Body>(ownerView).data;
+    const memberData = body<P2Body>(memberView).data;
+    // Same tenant-wide rights: no per-campaign permission changes the payload.
+    expect(memberData).toEqual(ownerData);
+    expect(ownerData.campaigns.map((row) => row.campaign.id)).toEqual([
+      campaigns[0],
+    ]);
+    expect(ownerData.originCampaignId).toBe(campaigns[0]);
+    await http()
+      .get(url(prospects[1]))
+      .set('Authorization', `Bearer ${ownerA}`)
+      .expect(404);
+    await http()
+      .get(url(prospects[1]))
+      .set('Authorization', `Bearer ${memberA}`)
+      .expect(404);
   });
 
   it('denies an external responsible and keeps campaign aggregates tenant-scoped', async () => {

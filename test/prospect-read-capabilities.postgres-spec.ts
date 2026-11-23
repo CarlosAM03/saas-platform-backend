@@ -301,6 +301,60 @@ describe('P2/P3 contextual reads and master update with PostgreSQL', () => {
     ).toBe(campaigns[0]);
   });
 
+  it('AC-P3-04 returns only provenance rows backed by the database', async () => {
+    const seeded = [
+      {
+        type: 'CREATED' as const,
+        campaignId: campaigns[0],
+        recordedAt: new Date('2026-01-01T00:00:00Z'),
+      },
+      {
+        type: 'LINKED' as const,
+        campaignId: campaigns[1],
+        recordedAt: new Date('2026-02-01T00:00:00Z'),
+      },
+      {
+        type: 'MASTER_UPDATED' as const,
+        campaignId: null,
+        recordedAt: new Date('2026-03-01T00:00:00Z'),
+      },
+    ];
+    for (const event of seeded)
+      await db.prospectProvenance.create({
+        data: {
+          tenantId: tenants[0],
+          prospectId,
+          source: 'manual',
+          actorUserId: actor,
+          ...event,
+        },
+      });
+    const page = await run(() =>
+      service.provenance(prospectId, { page: 1, limit: 10 }),
+    );
+    const stored = await db.prospectProvenance.findMany({
+      where: { tenantId: tenants[0], prospectId },
+      orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+    });
+    expect(page.meta).toEqual({ page: 1, limit: 10, total: 3, totalPages: 1 });
+    expect(page.data.map((event) => event.id)).toEqual(
+      stored.map((event) => event.id),
+    );
+    // Every exposed date, type and campaign comes from the stored row verbatim.
+    for (const [index, event] of page.data.entries()) {
+      expect(event.recordedAt.getTime()).toBe(
+        stored[index].recordedAt.getTime(),
+      );
+      expect(event.type).toBe(stored[index].type);
+      expect(event.campaignId).toBe(stored[index].campaignId);
+      expect(event.source).toBe(stored[index].source);
+    }
+    expect(page.data[0]).toMatchObject({
+      type: 'MASTER_UPDATED',
+      campaignId: null,
+    });
+  });
+
   it('P2 eligibility requires active user AND membership in this tenant; empty activity is null', async () => {
     const role = await db.role.create({
       data: { tenantId: tenants[0], name: 'OWNER' },

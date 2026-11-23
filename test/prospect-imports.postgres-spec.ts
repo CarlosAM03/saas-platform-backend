@@ -5,6 +5,7 @@ import { TenantContextService } from '../src/common/context/tenant-context.servi
 import { ProspectCsvParser } from '../src/prospects/imports/prospect-csv.parser';
 import { ProspectImportsService } from '../src/prospects/imports/prospect-imports.service';
 import { CampaignsService } from '../src/campaigns/campaigns.service';
+import { CampaignProspectsQuery } from '../src/campaigns/dto/campaign-prospects.query';
 
 describe('CSV atomicity with disposable PostgreSQL', () => {
   let prisma: PrismaService;
@@ -321,6 +322,162 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
       });
       await prisma.campaign.delete({ where: { id: destination.id } });
     }
+  });
+
+  it('AC-P4-03 UPDATE_EXISTING from B changes the shared master seen from A and records the change', async () => {
+    const master = await prisma.prospect.create({
+      data: {
+        tenantId,
+        campaignId,
+        name: 'Shared Master',
+        address: 'Old address',
+        source: 'manual',
+      },
+    });
+    await prisma.campaignProspect.create({
+      data: { campaignId, prospectId: master.id },
+    });
+    const second = await prisma.campaign.create({
+      data: { tenantId, name: 'Second campaign', createdBy: userId },
+    });
+    await prisma.campaignProspect.create({
+      data: { campaignId: second.id, prospectId: master.id },
+    });
+    const csv = Buffer.from('name,address\nShared Master,New address');
+    try {
+      await run(async () => {
+        const preview = await service.preview(second.id, csv);
+        expect(preview.rows[0].classification).toBe('MATCH');
+        const result = await service.confirm(
+          second.id,
+          csv,
+          preview.previewReference,
+          '[{"record":1,"action":"UPDATE_EXISTING"}]',
+        );
+        // The row carries the explicit action André must surface as a warning.
+        expect(result.rows).toEqual([
+          { record: 1, action: 'UPDATE_EXISTING', prospectId: master.id },
+        ]);
+        expect(result.summary.updated).toBe(1);
+        // Global effect: campaign A reads the updated shared master.
+        const fromA = await new CampaignsService(prisma, context).findProspects(
+          campaignId,
+          Object.assign(new CampaignProspectsQuery(), {}),
+        );
+        const row = fromA.data.find((item) => item.id === master.id)!;
+        expect(row.address).toBe('New address');
+        // Origin and protected fields stay untouched.
+        expect(row.campaignId).toBe(campaignId);
+        expect(row.source).toBe('manual');
+        expect(
+          await prisma.prospectProvenance.count({
+            where: {
+              tenantId,
+              campaignId: second.id,
+              prospectId: master.id,
+              type: 'MASTER_UPDATED',
+            },
+          }),
+        ).toBe(1);
+      });
+    } finally {
+      await prisma.campaignActivity.deleteMany({
+        where: { tenantId, campaignId: second.id },
+      });
+      await prisma.prospectProvenance.deleteMany({
+        where: { tenantId, campaignId: second.id },
+      });
+      await prisma.campaignProspect.deleteMany({
+        where: { campaignId: second.id },
+      });
+      await prisma.campaign.delete({ where: { id: second.id } });
+    }
+  });
+
+  it('AC-P4-07 reports created, linked, updated and skipped rows faithfully in one confirmation', async () => {
+    const linked = await prisma.prospect.create({
+      data: { tenantId, campaignId, name: 'Linked Master', source: 'manual' },
+    });
+    const updated = await prisma.prospect.create({
+      data: {
+        tenantId,
+        campaignId,
+        name: 'Updated Master',
+        address: 'Old street',
+        source: 'manual',
+      },
+    });
+    const csv = Buffer.from(
+      [
+        'name,address',
+        'Brand New,Street 1',
+        'Linked Master,Street 2',
+        'Updated Master,Street 3',
+        'Skipped Master,Street 4',
+      ].join('\n'),
+    );
+    await run(async () => {
+      const preview = await service.preview(campaignId, csv);
+      expect(preview.rows.map((row) => row.classification)).toEqual([
+        'NEW',
+        'MATCH',
+        'MATCH',
+        'NEW',
+      ]);
+      const result = await service.confirm(
+        campaignId,
+        csv,
+        preview.previewReference,
+        JSON.stringify([
+          { record: 1, action: 'CREATE' },
+          { record: 2, action: 'LINK_EXISTING' },
+          { record: 3, action: 'UPDATE_EXISTING' },
+          { record: 4, action: 'SKIP' },
+        ]),
+      );
+      const created = result.rows.find((row) => row.record === 1)!;
+      expect(created.action).toBe('CREATE');
+      expect(created.prospectId).toBeDefined();
+      expect(created.prospectId).not.toBe(linked.id);
+      expect(result.rows.slice(1)).toEqual([
+        { record: 2, action: 'LINK_EXISTING', prospectId: linked.id },
+        { record: 3, action: 'UPDATE_EXISTING', prospectId: updated.id },
+        { record: 4, action: 'SKIP' },
+      ]);
+      expect(result.summary).toEqual({
+        total: 4,
+        created: 1,
+        linked: 1,
+        updated: 1,
+        skipped: 1,
+        rejected: 0,
+      });
+      // Persisted truth matches the reported per-row outcome.
+      expect(
+        await prisma.prospect.count({ where: { tenantId, name: 'Brand New' } }),
+      ).toBe(1);
+      expect(
+        await prisma.prospect.count({
+          where: { tenantId, name: 'Skipped Master' },
+        }),
+      ).toBe(0);
+      const afterUpdate = await prisma.prospect.findUniqueOrThrow({
+        where: { id: updated.id },
+      });
+      expect(afterUpdate.address).toBe('Street 3');
+      const afterLink = await prisma.prospect.findUniqueOrThrow({
+        where: { id: linked.id },
+      });
+      expect(afterLink.address).toBeNull();
+      expect(
+        await prisma.campaignProspect.count({
+          where: {
+            campaignId,
+            prospectId: { in: [linked.id, updated.id, created.prospectId!] },
+          },
+        }),
+      ).toBe(3);
+    });
   });
 
   it('T04/P4 rejects multiple candidates without changing any persisted row', async () => {

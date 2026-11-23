@@ -8,6 +8,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { TenantContextService } from '../src/common/context/tenant-context.service';
 import { CampaignsService } from '../src/campaigns/campaigns.service';
 import { CampaignProspectsQuery } from '../src/campaigns/dto/campaign-prospects.query';
+import { PaginationDto } from '../src/common/dto/pagination.dto';
 
 const pipe = new ValidationPipe({
   transform: true,
@@ -475,6 +476,310 @@ describe('Campaign read capabilities on disposable PostgreSQL', () => {
       ].sort(),
     );
     expect(stored.content).toBe('Called the business, no answer');
+  });
+
+  it('AC-C1-03 records CERRADO to EN_SEGUIMIENTO with one traceable event and no automatic sale', async () => {
+    const prospectId = prospectIds[0];
+    const activitiesBefore = await db.campaignActivity.count({
+      where: { tenantId, campaignId, prospectId },
+    });
+    await run(() => svc.updateStage(campaignId, prospectId, 'CERRADO'));
+    await run(() => svc.updateStage(campaignId, prospectId, 'EN_SEGUIMIENTO'));
+    const events = await db.campaignActivity.findMany({
+      where: { tenantId, campaignId, prospectId, type: 'STAGE_CHANGE' },
+      orderBy: { id: 'asc' },
+    });
+    expect(events).toHaveLength(2);
+    expect(events[1]).toMatchObject({
+      previousValue: 'CERRADO',
+      newValue: 'EN_SEGUIMIENTO',
+      actorUserId: actor,
+    });
+    expect(events[1].recordedAt).toBeInstanceOf(Date);
+    // Exactly two rows append: reopening has no sale or extra commercial effect.
+    expect(
+      await db.campaignActivity.count({
+        where: { tenantId, campaignId, prospectId },
+      }),
+    ).toBe(activitiesBefore + 2);
+    expect(
+      (await run(() => svc.getParticipation(campaignId, prospectId)))
+        .commercialStage,
+    ).toBe('EN_SEGUIMIENTO');
+    expect(
+      (await db.prospect.findUniqueOrThrow({ where: { id: prospectId } }))
+        .status,
+    ).toBe('INACTIVO');
+    expect(
+      (await db.campaign.findUniqueOrThrow({ where: { id: campaignId } }))
+        .status,
+    ).toBe('ACTIVA');
+    expect(
+      await db.campaignProspect.count({ where: { campaignId, prospectId } }),
+    ).toBe(1);
+  });
+
+  it('AC-C2-03 keeps both evaluation events and the original NO_APTO reason', async () => {
+    // campaignB keeps this master's participation unevaluated.
+    const prospectId = prospectIds[2];
+    const target = campaignB;
+    await run(() =>
+      svc.updateEvaluation(target, prospectId, 'NO_APTO', 'Not our sector'),
+    );
+    await run(() => svc.updateEvaluation(target, prospectId, 'APTO'));
+    const events = await db.campaignActivity.findMany({
+      where: {
+        tenantId,
+        campaignId: target,
+        prospectId,
+        type: 'EVALUATION_CHANGE',
+      },
+      orderBy: { id: 'asc' },
+    });
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      previousValue: 'SIN_EVALUAR',
+      newValue: 'NO_APTO',
+      reason: 'Not our sector',
+      actorUserId: actor,
+    });
+    expect(events[1]).toMatchObject({
+      previousValue: 'NO_APTO',
+      newValue: 'APTO',
+      reason: null,
+    });
+    const participation = await run(() =>
+      svc.getParticipation(target, prospectId),
+    );
+    expect(participation).toMatchObject({
+      evaluation: 'APTO',
+      evaluationReason: null,
+      commercialStage: 'SIN_GESTIONAR',
+    });
+  });
+
+  it('AC-C2-04 changes evaluation only: stage, campaign and jobs stay untouched', async () => {
+    const prospectId = prospectIds[1];
+    const jobsBefore = await db.prospectingJob.count({ where: { tenantId } });
+    const campaign = await db.campaign.findUniqueOrThrow({
+      where: { id: campaignId },
+    });
+    const stageBefore = await db.campaignProspect.findUniqueOrThrow({
+      where: { campaignId_prospectId: { campaignId, prospectId } },
+    });
+    await run(() =>
+      svc.updateEvaluation(
+        campaignId,
+        prospectId,
+        'NO_APTO',
+        'Synthetic reason',
+      ),
+    );
+    const stageAfter = await db.campaignProspect.findUniqueOrThrow({
+      where: { campaignId_prospectId: { campaignId, prospectId } },
+    });
+    expect(stageAfter.commercialStage).toBe(stageBefore.commercialStage);
+    expect(stageAfter.commercialStage).toBe('CONTACTADO');
+    expect(
+      await db.campaign.findUniqueOrThrow({ where: { id: campaignId } }),
+    ).toEqual(campaign);
+    expect(await db.prospectingJob.count({ where: { tenantId } })).toBe(
+      jobsBefore,
+    );
+    // The stage never moved, so no STAGE_CHANGE event exists for this master.
+    expect(
+      await db.campaignActivity.count({
+        where: { tenantId, campaignId, prospectId, type: 'STAGE_CHANGE' },
+      }),
+    ).toBe(0);
+  });
+
+  it('AC-C3-02 records exactly one event per effective change and none for no-op or failed retries', async () => {
+    const prospectId = prospectIds[1];
+    const countEvents = () =>
+      db.campaignActivity.count({
+        where: { tenantId, campaignId, prospectId, type: 'RESPONSIBLE_CHANGE' },
+      });
+    await run(() =>
+      svc.assignResponsible(campaignId, prospectId, responsibleId),
+    );
+    expect(await countEvents()).toBe(1);
+    // No-op reassignment must not append a second event.
+    await run(() =>
+      svc.assignResponsible(campaignId, prospectId, responsibleId),
+    );
+    expect(await countEvents()).toBe(1);
+    // A failed attempt (ineligible user) must not append either.
+    await expect(
+      run(() => svc.assignResponsible(campaignId, prospectId, 'missing-user')),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(await countEvents()).toBe(1);
+    const events = await db.campaignActivity.findMany({
+      where: { tenantId, campaignId, prospectId, type: 'RESPONSIBLE_CHANGE' },
+    });
+    expect(events[0]).toMatchObject({
+      previousValue: null,
+      newValue: responsibleId,
+      actorUserId: actor,
+    });
+  });
+
+  it('AC-C3-03 appends a correction and leaves the original activity intact', async () => {
+    const prospectId = prospectIds[0];
+    const original = await run(() =>
+      svc.createActivity(campaignId, prospectId, {
+        type: 'CALL',
+        content: 'Called at noon',
+      }),
+    );
+    const before = await db.campaignActivity.findUniqueOrThrow({
+      where: { id: original.id },
+    });
+    const correction = await run(() =>
+      svc.createActivity(campaignId, prospectId, {
+        type: 'CORRECTION',
+        content: 'Actually it was 3 pm',
+        correctsId: original.id,
+      }),
+    );
+    expect(correction).toMatchObject({
+      type: 'CORRECTION',
+      correctsId: original.id,
+      content: 'Actually it was 3 pm',
+    });
+    expect(
+      await db.campaignActivity.findUniqueOrThrow({
+        where: { id: original.id },
+      }),
+    ).toEqual(before);
+    const page = await run(() =>
+      svc.activities(campaignId, prospectId, {
+        page: 1,
+        limit: 100,
+      } as unknown as PaginationDto),
+    );
+    expect(page.meta.total).toBeGreaterThanOrEqual(2);
+    expect(page.data.some((row) => row.id === correction.id)).toBe(true);
+    expect(page.data.some((row) => row.id === original.id)).toBe(true);
+  });
+
+  it('AC-C6-04 filters and paginates hundreds of participations server-side', async () => {
+    const bulk = await db.campaign.create({
+      data: { tenantId, createdBy: actor, name: 'Bulk campaign' },
+    });
+    const rows = Array.from({ length: 300 }, (_, index) => index);
+    for (const index of rows) {
+      const prospect = await db.prospect.create({
+        data: {
+          tenantId,
+          campaignId: bulk.id,
+          name: `Bulk ${index}`,
+          category: index % 2 === 0 ? 'Even' : 'Odd',
+          source: 'manual',
+        },
+      });
+      await db.campaignProspect.create({
+        data: {
+          campaignId: bulk.id,
+          prospectId: prospect.id,
+          commercialStage: index % 3 === 0 ? 'CERRADO' : 'CONTACTADO',
+        },
+      });
+    }
+    try {
+      const first = await run(() =>
+        svc.findProspects(
+          bulk.id,
+          Object.assign(new CampaignProspectsQuery(), { page: 1, limit: 25 }),
+        ),
+      );
+      expect(first.data).toHaveLength(25);
+      expect(first.meta).toEqual({
+        page: 1,
+        limit: 25,
+        total: 300,
+        totalPages: 12,
+      });
+      const filtered = await run(() =>
+        svc.findProspects(
+          bulk.id,
+          Object.assign(new CampaignProspectsQuery(), {
+            stage: 'CERRADO',
+            page: 1,
+            limit: 25,
+          }),
+        ),
+      );
+      expect(filtered.meta.total).toBe(100);
+      expect(filtered.data).toHaveLength(25);
+      // Only the requested page travels: 25 rows for a 300-row campaign.
+      expect(filtered.data.length).toBeLessThan(filtered.meta.total);
+    } finally {
+      await db.campaignProspect.deleteMany({ where: { campaignId: bulk.id } });
+      await db.prospect.deleteMany({ where: { campaignId: bulk.id } });
+      await db.campaign.delete({ where: { id: bulk.id } });
+    }
+  });
+
+  it('AC-C3-05 paginates activities with stable order, exact counts and no duplicates', async () => {
+    const prospectId = prospectIds[0];
+    const seeded = await db.campaignActivity.count({
+      where: { tenantId, campaignId, prospectId },
+    });
+    // Ties on recordedAt are broken by id desc; insert deliberately tied rows.
+    const tied = new Date('2026-02-01T00:00:00Z');
+    for (let i = 0; i < 5; i++)
+      await db.campaignActivity.create({
+        data: {
+          tenantId,
+          campaignId,
+          prospectId,
+          type: 'NOTE',
+          content: `Paged ${i}`,
+          recordedAt: tied,
+          actorUserId: actor,
+        },
+      });
+    const total = seeded + 5;
+    const limit = 2;
+    const totalPages = Math.ceil(total / limit);
+    const pageOf = (page: number) =>
+      run(() =>
+        svc.activities(campaignId, prospectId, {
+          page,
+          limit,
+        } as unknown as PaginationDto),
+      );
+    const collected: string[] = [];
+    for (let page = 1; page <= totalPages; page++) {
+      const result = await pageOf(page);
+      expect(result.meta).toEqual({ page, limit, total, totalPages });
+      collected.push(...result.data.map((activity) => activity.id));
+    }
+    // Every row appears exactly once across the pages.
+    expect(collected).toHaveLength(total);
+    expect(new Set(collected).size).toBe(total);
+    const expected = await db.campaignActivity.findMany({
+      where: { tenantId, campaignId, prospectId },
+      orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+      select: { id: true },
+    });
+    expect(collected).toEqual(expected.map((activity) => activity.id));
+    // Out of range is empty but keeps the real total.
+    const beyond = await pageOf(totalPages + 1);
+    expect(beyond.data).toEqual([]);
+    expect(beyond.meta.total).toBe(total);
+    // The listing stays tenant-scoped.
+    await expect(
+      run(
+        () =>
+          svc.activities(campaignId, prospectId, {
+            page: 1,
+            limit,
+          } as unknown as PaginationDto),
+        foreignTenantId,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('AC-C2-01 rejects NO_APTO without a reason and mutates nothing', async () => {
