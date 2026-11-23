@@ -15,26 +15,28 @@
 | Build | PASS, código 0 | §4 |
 | Unitarias | 12 suites, 177/177 PASS | §4 |
 | E2E HTTP | 7 suites, 84/84 PASS | §4 |
-| PostgreSQL 16 desechable | 15 suites, 184/184 PASS; 4 migraciones sin pendientes | §4 |
+| PostgreSQL 16 desechable | 15 suites, 196/196 PASS; 4 migraciones sin pendientes | §4 |
 | Rendimiento descriptivo | 4/4 casos; sin SLA | `CIERRE_LECTURA_7A63DFB.md` |
 | Paridad OpenAPI/Swagger CP | rutas CP presentes; `yamlOnly=[]` en la verificación previa | `MATRIZ_QA.md` (registros por SHA) |
 | Sensibilidad de prueba de instantánea | rojo con implementación secuencial, verde con `RepeatableRead` | `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md` |
-| Cobertura por AC | 37 CUBIERTO · 13 CUBIERTO_PARCIAL · 0 NO_CUBIERTO | `MATRIZ_COBERTURA_AC.md` |
+| Cobertura por AC | 49 CUBIERTO · 1 CUBIERTO_PARCIAL · 0 NO_CUBIERTO | `MATRIZ_COBERTURA_AC.md` |
 
-Total funcional de la última corrida: **445 pruebas** en 34 suites (177 unitarias + 84 HTTP + 184 PostgreSQL).
+Total funcional de la última corrida: **457 pruebas** en 34 suites (177 unitarias + 84 HTTP + 196 PostgreSQL).
 
 ## 2. Qué quedó cubierto por criterio
 
-Los 50 AC del SPEC tienen al menos una aserción asociada. Los 37 `CUBIERTO` incluyen: pipeline por participación y separación de `status` legado, evaluación con motivo obligatorio, ausencia de mutación ante rechazo y aislamiento A/B, bitácora contextual, dashboard de una sola instantánea con partición exhaustiva y campaña vacía coherente, filtros server-side con conteo y paginación estables, identidad fuerte/débil con decisión explícita, campañas asociadas con resumen de A intacto al mutar B, procedencia global y CSV con preview/confirm, rechazo seguro de múltiples candidatos, asignación por campaña sin interferencia y rechazo de responsables inactivos o sin membresía.
+Los 50 AC del SPEC tienen al menos una aserción asociada y los 49 `CUBIERTO` incluyen: pipeline por participación con transiciones trazadas y sin venta automática, evaluación con motivo obligatorio y secuencia manual conservando el motivo, bitácora contextual con correcciones que preservan el original, paginación 1..N con orden estable, dashboard de una sola instantánea con campaña vacía coherente, filtros server-side con volumen de 300 participaciones, identidad fuerte/débil con decisión explícita, campañas asociadas con roles OWNER/MEMBER equivalentes y resumen de A intacto al mutar B, procedencia respaldada por BD, CSV con resultado por fila de creado/vinculado/actualizado/omitido y efecto global de `UPDATE_EXISTING` verificado.
 
 ## 3. Brechas que el owner debe conocer antes de aceptar
 
-1. **13 AC parciales.** Las más relevantes: `AC-C4-01` (no hay camino positivo con `MEMBER`/`ADMIN`), `AC-C1-03` (falta el evento `STAGE_CHANGE` de `CERRADO → EN_SEGUIMIENTO`), `AC-C2-03` (secuencia manual `No apto → Apto` conservando el motivo inicial), `AC-C3-05` (paginación 1..N de actividades con orden estable), `AC-P4-03` (no se verifica el aviso de efecto global de `UPDATE_EXISTING`) y `AC-P4-07` (falta resultado por fila de vinculado/omitido en la misma respuesta). El listado completo está en `MATRIZ_COBERTURA_AC.md`.
-2. **Pruebas parciales no equivalen a comportamiento ausente.** Varias brechas son de representación o de contrato, no de implementación; se declaran como tales para no inflar el estado del gate.
+1. **1 AC parcial: `AC-P3-02`.** El SPEC menciona «preview/omitir/revertir». Preview, omisión y rechazo están cubiertos sin escrituras; **la API no expone operación de reversión** y el contrato no la declara. La brecha es de alcance funcional, no de prueba: se requiere decisión del owner sobre si el sprint debe incluirla o si basta el rechazo seguro actual.
+2. **Pruebas parciales no equivalen a comportamiento ausente.** Varias brechas históricas eran de representación o contrato, no de implementación.
 3. **T32 `NOT_RUN`.** Es E2E Flutter y no puede declararse desde el backend.
 4. **Rendimiento.** Las mediciones son descriptivas sobre datos sintéticos (5 000 participaciones), sin SLA ni equivalencia productiva.
 5. **Doble HTTP en memoria.** La regresión E2E usa dobles fieles a `select`/`where` anidados, pero no sustituye PostgreSQL para reglas de dominio.
 6. **Concurrencia real.** La prueba determinista controla el intercalado mediante un proxy de pruebas; no reproduce latencia de red ni reintentos de Prisma.
+7. **`AC-C2-04`.** Verifica ausencia de jobs y de cambio de etapa; no intercepta tráfico de red hacia Prospector.
+8. **`AC-P4-03`.** El «aviso» de efecto global es presentación en Flutter; el backend entrega la acción explícita y el efecto verificable.
 
 ## 4. Comandos exactos de la ejecución de referencia
 
@@ -57,8 +59,8 @@ docker compose --profile test run --build --rm test-postgres sh -c "npm run test
 
 ## 6. Decisión solicitada al owner
 
-1. ¿Acepta G4 con las 13 brechas parciales declaradas y T32 reservado al frontend?
-2. Si no, ¿qué brechas deben cerrarse antes de autorizar G5/handoff a André?
-3. ¿Autoriza el segundo commit de pruebas y documentación de este bloque en `feat/sprint-campana-prospector`?
+1. ¿Acepta G4 con 49 AC cubiertos y `AC-P3-02` parcial por ausencia de operación de reversión en el contrato?
+2. ¿Exige implementar o documentar formalmente una operación de reversión antes de G5, o acepta que el rechazo seguro actual cubre el criterio?
+3. ¿Autoriza el commit de pruebas y documentación de este bloque en `feat/sprint-campana-prospector`?
 
 Este documento no cierra G4, no autoriza merge y no declara terminado el sprint. G5 sigue provisional; G6 depende de la revisión del owner.

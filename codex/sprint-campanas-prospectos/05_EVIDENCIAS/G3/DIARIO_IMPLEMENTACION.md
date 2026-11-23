@@ -2,6 +2,10 @@
 
 **ESTADO: IMPLEMENTACIÓN COMPLETA — G4 EN CONCLUSIÓN TÉCNICA PARA REVISIÓN DEL OWNER**
 
+## Cierre del bloque de brechas — 2026-11-23
+
+HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Tras la decisión del owner de no aceptar G4 con parciales, se añadieron doce pruebas dirigidas que cierran `AC-C4-01`, `AC-C3-05`, `AC-P4-03`, `AC-P4-07`, `AC-C1-03`, `AC-C2-03`, `AC-C2-04`, `AC-C3-02`, `AC-C3-03`, `AC-C6-04`, `AC-P2-04` y `AC-P3-04`. Regresión: build PASS, 177 unitarias, 84 HTTP, 196 PostgreSQL (457 en total) sobre PG16 desechable. Cobertura: 49 `CUBIERTO`, 1 `CUBIERTO_PARCIAL` (`AC-P3-02`, sin operación de reversión en el contrato), 0 `NO_CUBIERTO`. Sin cambios en `src/`, `Prisma/`, migraciones ni módulos protegidos. Evidencia: `../G4/CIERRE_BRECHAS_AC_7A63DFB.md`. G4 sigue sin cerrar; la aceptación es del owner.
+
 ## Cierre del bloque de cobertura — 2026-11-23
 
 HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Se añadieron ocho pruebas de AC (`AC-C2-01`, `AC-C2-02`, `AC-C3-04`, `AC-C4-02`, `AC-C4-03`, `AC-C8-01`, `AC-C8-04`, `AC-P2-02`) y se reforzó la prueba de instantánea del dashboard con aserciones exactas y un intercalado determinista. Regresión: build PASS, 177 unitarias, 84 HTTP, 184 PostgreSQL (445 en total) sobre PG16 desechable. Sin cambios en `src/`, `Prisma/`, migraciones ni módulos protegidos. Evidencia: `../G4/COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`. G4 sigue sin cerrar; la aceptación es del owner.
