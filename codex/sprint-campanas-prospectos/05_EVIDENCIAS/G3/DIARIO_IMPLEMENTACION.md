@@ -1,6 +1,14 @@
 # G3 — Diario de implementación
 
-**ESTADO: IMPLEMENTACIÓN DE BASE COMPLETADA — VALIDACIÓN G4 PENDIENTE**
+**ESTADO: IMPLEMENTACIÓN COMPLETA — G4 EN CONCLUSIÓN TÉCNICA PARA REVISIÓN DEL OWNER**
+
+## Cierre del bloque de cobertura — 2026-11-23
+
+HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` + worktree de pruebas. Se añadieron cinco pruebas de AC (`AC-C2-02`, `AC-C3-04`, `AC-C4-03`, `AC-C8-01`, `AC-P2-02`) y se reforzó la prueba de instantánea del dashboard con aserciones exactas y un intercalado determinista. Regresión: build PASS, 177 unitarias, 84 HTTP, 181 PostgreSQL (442 en total) sobre PG16 desechable. Sin cambios en `src/`, `Prisma/`, migraciones ni módulos protegidos. Evidencia: `../G4/COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`. G4 sigue sin cerrar; la aceptación es del owner.
+
+## Sincronización de seguimiento — 2026-11-22
+
+HEAD candidato: `e2bc9275836b642ac3e2b6086c4c15062b4dcd89`; inicio registrado en `../G4/INICIO_VALIDACION_E2BC927.md`. Los límites de cierre de G3 que aparecen abajo son históricos, no un inventario vigente de pendientes. G4 ya registra Swagger servido/paridad CP y ensayos PostgreSQL de concurrencia, tenant y legacy en SHAs posteriores a la implementación inicial. La última regresión completa documentada antes de este candidato corresponde a `71ef72d95537b12713dc81bb91b6abd03018df1c` (114 unitarias, 84 HTTP, 98 PostgreSQL); no se traslada su PASS al HEAD actual. La validación independiente del candidato está en curso.
 
 | Fecha | SHA | Feature(s) | Código/contrato/migración | Prueba incremental | Resultado observado | Restricción / próximo paso |
 |---|---|---|---|---|---|---|

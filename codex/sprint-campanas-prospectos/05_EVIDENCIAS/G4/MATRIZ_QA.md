@@ -1,6 +1,51 @@
 # G4 — QA por SHA y rastreabilidad
 
-**ESTADO: EJECUCIÓN PARCIAL — G4 NO CERRADO**
+**ESTADO: G4 NO CERRADO — CONCLUSIÓN TÉCNICA LISTA PARA REVISIÓN DEL OWNER**
+
+## Ejecución vigente — pruebas de cobertura AC y sensibilidad de instantánea (2026-11-23)
+
+HEAD de código `7a63dfbe1d72b695457cf99b830f186af9b3d2bb` **+ worktree modificado** en `test/campaigns-read-capabilities.postgres-spec.ts` y `test/prospect-read-capabilities.postgres-spec.ts`. Detalle completo en `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md`; conclusión para el owner en `CONCLUSION_G4_7A63DFB.md`.
+
+| ID | Gate | Fecha | HEAD | Comando | Dataset | Esperado | Observado | Estado | Evidencia |
+|---|---|---|---|---|---|---|---|---|---|
+| BUILD-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run build` | árbol del HEAD | compila | código 0 | PASS | `COBERTURA_AC_Y_CONCURRENCIA_7A63DFB.md` |
+| UNIT-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run test:unit:ci` | fixtures unitarios sintéticos | verde | 12 suites, 177/177 | PASS | mismo documento |
+| HTTP-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run test:e2e:ci` | dobles HTTP en memoria | verde | 7 suites, 84/84 | PASS | mismo documento |
+| PG-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npm run test:postgres` (PG16 desechable) | fixtures sintéticos; 4 migraciones sin pendientes | verde | 15 suites, 181/181 | PASS | mismo documento |
+| SNAP-RED | G4 | 2026-11-23 | `7a63dfb` + worktree con `dashboard` secuencial temporal | `npm run test:postgres -- --testPathPatterns=campaigns-read-capabilities -t 'keeps one snapshot'` | 2 participaciones + 1 escritura intercalada | la prueba falla | `Expected: 2`, `Received: 3` en `activity.events` | PASS de sensibilidad | mismo documento |
+| LINT-CP-AC | G4 | 2026-11-23 | `7a63dfb` + worktree | `npx eslint`; `npx prettier --check` | dos archivos de prueba modificados | código 0 | código 0 | PASS | mismo documento |
+
+Total funcional vigente: **442 pruebas** (177 + 84 + 181) en 34 suites; las 4 de rendimiento quedan fuera. Los AC quedaron en 34 `CUBIERTO` · 16 `CUBIERTO_PARCIAL` · 0 `NO_CUBIERTO` según `MATRIZ_COBERTURA_AC.md`.
+
+Aclaración de atribución: estos resultados corresponden al **HEAD más el worktree de pruebas**, no a un commit nuevo. La sensibilidad de la prueba del dashboard quedó demostrada; antes de este bloque la aserción `events >= total` habría aceptado una lectura mixta.
+
+## Última ejecución integrada — worktree correctivo final en Node 20
+
+Evidencia vigente de ejecución: `VALIDACION_FINAL_WORKTREE_E2BC927.md`, intervalo `2026-11-22T20:49:01-08:00` a `2026-11-22T20:50:18-08:00`, HEAD base exacto `e2bc9275836b642ac3e2b6086c4c15062b4dcd89` **+ worktree sin commit identificado por SHA256**. Build PASS, 143/143 unitarias, 84/84 HTTP, 127/127 PostgreSQL; 354 pruebas en total. Ejecución independiente real en Node `20.20.2` / npm `10.8.2`, PostgreSQL 16 desechable; migraciones sin pendientes. No se atribuye el resultado al commit aislado ni se declara cumplimiento exhaustivo de AC.
+
+RI08 tiene ahora PASS unitario y PG para los escenarios ejecutados: incorporación nueva vía UPDATE_EXISTING clasificada como reutilizada; origen legacy desconocido preservado; sin LINKED ficticio en relación existente ni duplicación al repetir con nuevo preview. La reproducción roja y la revisión estática independiente permanecen en sus registros históricos.
+
+Lint y formato dirigidos a diez archivos TS modificados: integrador ejecutó `npx eslint` y `npx prettier --check`, ambos código 0 después de correcciones de estilo/tipos en pruebas, registradas en `BLOQUE_CORRECTIVO_E2BC927.md`. Performance conserva la atribución anterior; no se repitió, pues servicio campañas y fixture mantienen los mismos hashes.
+
+**G4 continúa abierto** por capacidades C6/P2/P3/representación de elegibilidad y aclaración D06/G4-O3. G5 sigue provisional; G6 no aceptado por owner; T32 NOT_RUN, reservado al frontend. No hubo push, merge, deploy ni migración remota.
+
+## Sincronización del candidato e2bc927 — 2026-11-22
+
+HEAD: `e2bc9275836b642ac3e2b6086c4c15062b4dcd89`. QA independiente ejecutó build PASS, 115/115 unitarias y 84/84 HTTP; PostgreSQL quedó inicialmente BLOCKED por Docker Desktop no disponible. Ver `REGRESION_E2BC927.md` para comandos, fecha y límites. Después el integrador inició Docker Desktop local y ejecutó el comando PG autorizado: 11 suites, 98/98 PASS, cuatro migraciones aplicadas sobre la base desechable del perfil `test`. Ese resultado complementa, no borra, el bloqueo inicial. La imagen contiene el código funcional del candidato anterior a las correcciones; cambios documentales concurrentes no heredan cobertura funcional.
+
+Revisión independiente y contrato detectaron defectos adicionales pese a la regresión verde: `REVISION_INDEPENDIENTE_E2BC927.md` y `CONTRATO_E2BC927.md`. G4 **no está aprobado**. Se abrió bloque correctivo con pruebas dirigidas antes de cada arreglo; sus resultados se atribuirán a HEAD + worktree, no al candidato inmutable.
+
+T25: el test agregado en `1aa5924` ya se ejecutó en QA; usa reloj simulado y rechaza exactamente en el límite de quince minutos. No se exige una espera real como requisito adicional del SPEC. Esto no sustituye otras aserciones de parser/snapshot/replay ni cierra por sí solo todos los AC.
+
+Los encabezados “final”, “actual” y “más reciente” de los apartados siguientes corresponden al registro histórico de sus SHAs; no deben interpretarse como el estado vigente.
+
+### Validación independiente del bloque correctivo (worktree, no nuevo commit)
+
+`VALIDACION_CORRECCIONES_E2BC927.md` registra la ejecución independiente del `2026-11-22T20:42:55-08:00` al `2026-11-22T20:45:17-08:00`: build PASS, 141/141 unitarias, 84/84 HTTP, 126/126 PostgreSQL (13 suites), 4/4 pruebas de rendimiento dirigidas. El manifiesto SHA256 inicial/final del worktree está en ese documento; **no se atribuyen estos resultados al commit e2bc927 aislado ni a modificaciones posteriores**.
+
+Rendimiento descriptivo sobre 5,000 participaciones de campaña: medianas de cinco muestras de filtro combinado 584.186 ms, página profunda 46.668 ms y dashboard 245.296 ms; sin SLA ni equivalencia productiva. Dataset total: 6,000 maestros, 7,667 participaciones, 18,000 actividades y 5,001 procedencias, dos tenants. No basta para certificar las capacidades C6 aún ausentes.
+
+La segunda revisión encontró RI08 (UPDATE_EXISTING CSV crea participación sin procedencia LINKED). Se abrió reproducción y corrección dirigida posterior a esta corrida; el PASS general no resuelve ese camino. C6/P2/P3/representación de elegibilidad y D06 continúan pendientes, G4 abierto, G5 provisional. T32 permanece NOT_RUN de frontend.
 
 ## Resultado final de regresión — 2026-11-22
 
