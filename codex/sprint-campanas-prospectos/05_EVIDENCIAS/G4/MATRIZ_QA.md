@@ -2,6 +2,21 @@
 
 **ESTADO: G4 NO CERRADO — CONCLUSIÓN TÉCNICA LISTA PARA REVISIÓN DEL OWNER**
 
+## Bloque O4-B / O5-A — dashboard y paridad del enum (2026-11-23)
+
+Instrucción del owner del `2026-11-23`: `G4-O4` opción B (`CORRECTION` cuenta como actividad manual), `G4-O5` opción A (`MASTER_UPDATE` en el enum de respuesta del YAML) y verificación del Swagger servido; además ratificó que `AC-P3-02` se cubre con rollback y no exige endpoint de reversión. El bloque se ejecutó sobre el árbol de trabajo del HEAD `fd513fc046415925a61252adbed350fbd70eed8f` y se volvió a ejecutar sobre el commit limpio `3b5eec6fa99f846e853794fc8aedff2c4353c269`, con resultado idéntico.
+
+| ID | Gate | Fecha | HEAD | Comando | Dataset | Esperado | Observado | Estado | Evidencia |
+|---|---|---|---|---|---|---|---|---|---|
+| BUILD-O4O5 | G4 | 2026-11-23 | `3b5eec6` limpio | `docker compose --profile test run --build --rm test-postgres sh -c "npm run build && npm run test:unit:ci && npm run test:e2e:ci && npm run prisma:migrate:deploy && npm run test:postgres"` | árbol del commit | compila | código 0; `compose` exit 0 | PASS | `BLOQUE_O4_O5_3B5EEC6.md` |
+| UNIT-O4O5 | G4 | 2026-11-23 | `3b5eec6` limpio | misma cadena | fixtures unitarios sintéticos | verde, incluye ancla de contrato | 12 suites, 178/178 | PASS | mismo documento |
+| HTTP-O4O5 | G4 | 2026-11-23 | `3b5eec6` limpio | misma cadena | dobles HTTP en memoria | verde, incluye Swagger servido | 7 suites, 84/84 | PASS | mismo documento |
+| PG-O4O5 | G4 | 2026-11-23 | `3b5eec6` limpio | misma cadena | PostgreSQL 16 desechable; 4 migraciones sin pendientes | verde, incluye corrección como manual | 15 suites, 199/199 | PASS | mismo documento |
+| SWAGGER-O4O5 | G4 | 2026-11-23 | `3b5eec6` limpio | `npx jest --config ./test/jest-e2e.json test/without-prospector.e2e-spec.ts -t 'publishes Swagger'` | documento servido `/api/docs-json` de la app Nest | `CORRECTION` manual, `MASTER_UPDATE` en enum, entrada manual restringida | 1/1 PASS | PASS | mismo documento |
+| SENS-O4O5-RED | G4 | 2026-11-23 | `fd513fc` + worktree con `CORRECTION` retirado de `manualTypes` | `npm run test:postgres -- --testPathPatterns=campaigns-read-capabilities -t 'human correction'` | campaña sintética con 1 evento, 1 actividad y 1 corrección | la prueba falla | `expect(dashboard.activity).toEqual(...)` FAIL; restaurado y confirmado con `git diff` | PASS de sensibilidad | mismo documento |
+
+Total funcional vigente: **461 pruebas** (178 + 84 + 199) en 34 suites, sobre el árbol limpio de `3b5eec6`. Los bloques anteriores (459, 457, 445, 442, 354) quedan como registro histórico con su SHA.
+
 ## Revisión técnica final (2026-11-23)
 
 Instrucción del owner: revisión de cobertura, fixtures de roles, aislamiento, migraciones y paridad contractual sobre el candidato exacto antes de aceptar G4. Resultado: **sin hallazgos bloqueantes**. Se resolvieron un hallazgo alto (fixture ADMIN no representativo en `AC-C4-01`) y cuatro medios (sobreafirmación de `AC-P4-04`, estado intermedio de migraciones, dependencia de orden y garantía estructural de `AC-C2-04`), más drift documental de contrato (`409` de `match`, `x-contract-status`, `SortBy` enum, `400/403`). Dos decisiones quedaron escaladas: `G4-O4` (clasificación de `CORRECTION`) y `G4-O5` (enum `MASTER_UPDATE`). Regresión sobre el árbol revisado: build PASS, 177 unitarias, 84 HTTP y **198 PostgreSQL** — **459 pruebas**. Detalle en `REVISION_FINAL_G4_2026-11-23.md` y `CONTRATO_REVISION_FINAL_0d1dd02.md`.

@@ -2,6 +2,10 @@
 
 **ESTADO: HANDOFF PROVISIONAL — NO LISTO_PARA_ANDRE**
 
+## Sincronización — 2026-11-23 (O4-B / O5-A aplicadas)
+
+El owner autorizó y el integrador aplicó las dos decisiones pendientes en el commit `3b5eec6fa99f846e853794fc8aedff2c4353c269`: `CORRECTION` cuenta como actividad manual en `activity.manual` (`G4-O4-B`) y `MASTER_UPDATE` figura en el enum de respuesta `CampaignActivityType` del contrato servido, sin habilitarse en el alta manual (`G4-O5-A`). Regresión sobre árbol limpio de ese commit: 178 unitarias, 84 HTTP y 199 PostgreSQL (461 pruebas). Estas decisiones sí afectan lo que André debe consumir; el contrato servido ya las refleja. G4 sigue pendiente de aceptación del owner y G5 continúa provisional: no se genera el ZIP de André. Evidencia en `../G4/BLOQUE_O4_O5_3B5EEC6.md` y `../G4/CONCLUSION_G4_3B5EEC6.md`.
+
 ## Sincronización — 2026-11-23 (revisión final pre-aceptación)
 
 Revisión técnica final ejecutada por encargo del owner: sin hallazgos bloqueantes. Se resolvieron el fixture ADMIN de `AC-C4-01`, la reatribución de `AC-P4-04`, el estado intermedio de migraciones y drift documental del contrato. Quedan escaladas al owner las decisiones `G4-O4` y `G4-O5`, que afectan la representación del contrato para André. G5 se prepara tras la aceptación de G4. Evidencia en `../G4/REVISION_FINAL_G4_2026-11-23.md`. Sin push, merge, deploy ni ZIP de André.

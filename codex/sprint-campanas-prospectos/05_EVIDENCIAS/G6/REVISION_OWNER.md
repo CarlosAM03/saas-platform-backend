@@ -2,6 +2,10 @@
 
 **ESTADO: PENDIENTE_OWNER**
 
+## Sincronización — 2026-11-23 (O4-B / O5-A aplicadas)
+
+Las dos decisiones escaladas quedaron resueltas por el owner y aplicadas en `3b5eec6fa99f846e853794fc8aedff2c4353c269`: `CORRECTION` como actividad manual (`G4-O4-B`) y `MASTER_UPDATE` en el enum de respuesta del contrato (`G4-O5-A`). El candidato se verificó en árbol limpio: 178 unitarias, 84 HTTP y 199 PostgreSQL (461 pruebas), Swagger servido con las tres comprobaciones de actividad y arnés íntegro. G4 se presenta para aceptación; este seguimiento no constituye aceptación. No hubo push, merge, deploy ni PR. Evidencia en `../G4/BLOQUE_O4_O5_3B5EEC6.md` y `../G4/CONCLUSION_G4_3B5EEC6.md`.
+
 ## Sincronización — 2026-11-23 (revisión final pre-aceptación)
 
 Revisión técnica final ejecutada por encargo del owner sobre el candidato exacto: **sin hallazgos bloqueantes**. Cobertura 50/50 AC; paridad contractual 25 ↔ 25 operaciones con Swagger servido `PARITY_OK`; aislamiento de tenant y migraciones sin hallazgos. Se resolvieron 1 alto y 4 medios; 2 decisiones (`G4-O4`, `G4-O5`) esperan al owner. G4 está listo para la decisión del owner; T32 sigue `NOT_RUN`. Detalle en `../G4/REVISION_FINAL_G4_2026-11-23.md` y `../G4/CONCLUSION_G4_7A63DFB.md`. Sin push, merge, deploy ni PR.
