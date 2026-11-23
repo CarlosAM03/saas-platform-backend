@@ -9,6 +9,7 @@ import { TenantContextService } from '../src/common/context/tenant-context.servi
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { ProspectsController } from '../src/prospects/prospects.controller';
 import { ProspectsService } from '../src/prospects/prospects.service';
+import { CampaignsService } from '../src/campaigns/campaigns.service';
 
 // Synthetic, disposable profile only. HTTP harness exercises DTOs/serialization,
 // not the protected authentication/role guards (covered by the isolation suite).
@@ -251,6 +252,53 @@ describe('P2/P3 contextual reads and master update with PostgreSQL', () => {
     expect(p1.meta).toEqual({ page: 1, limit: 1, total: 2, totalPages: 2 });
     expect(p1.campaigns[0].campaign.id).not.toBe(p2.campaigns[0].campaign.id);
     expect(await snapshot()).toEqual(before);
+  });
+
+  it('AC-P2-02 mutating B leaves the A summary untouched', async () => {
+    const campaignsService = new CampaignsService(db, context);
+    const summarise = async () => {
+      const result = await run(() => service.campaignsForProspect(prospectId));
+      const pick = (campaignId: string) => {
+        const row = result.campaigns.find(
+          (item) => item.campaign.id === campaignId,
+        )!;
+        return {
+          campaign: row.campaign,
+          isOrigin: row.isOrigin,
+          stage: row.stage,
+          evaluation: row.evaluation,
+          responsible: row.responsible,
+          addedAt: row.addedAt,
+        };
+      };
+      return { a: pick(campaigns[0]), b: pick(campaigns[1]) };
+    };
+    const before = await summarise();
+    expect(before.a.isOrigin).toBe(true);
+    expect(before.b.isOrigin).toBe(false);
+
+    await run(() =>
+      campaignsService.updateStage(campaigns[1], prospectId, 'CERRADO'),
+    );
+    await run(() =>
+      campaignsService.updateEvaluation(
+        campaigns[1],
+        prospectId,
+        'NO_APTO',
+        'Synthetic reason for B',
+      ),
+    );
+
+    const after = await summarise();
+    // A's summary is byte-identical: no stage, evaluation or metadata drift.
+    expect(after.a).toEqual(before.a);
+    expect(after.b.stage).toBe('CERRADO');
+    expect(after.b.evaluation).toBe('NO_APTO');
+    // The master keeps pointing at its original campaign.
+    expect(
+      (await db.prospect.findUniqueOrThrow({ where: { id: prospectId } }))
+        .campaignId,
+    ).toBe(campaigns[0]);
   });
 
   it('P2 eligibility requires active user AND membership in this tenant; empty activity is null', async () => {

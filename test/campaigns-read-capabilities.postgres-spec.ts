@@ -348,6 +348,135 @@ describe('Campaign read capabilities on disposable PostgreSQL', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('AC-C2-02 keeps an independent evaluation per campaign for the same master', async () => {
+    const prospectId = prospectIds[0];
+    const a = await run(() =>
+      svc.updateEvaluation(campaignId, prospectId, 'APTO'),
+    );
+    const b = await run(() =>
+      svc.updateEvaluation(campaignB, prospectId, 'NO_APTO', 'Not useful here'),
+    );
+    expect(a.evaluation).toBe('APTO');
+    expect(a.evaluationReason).toBeNull();
+    expect(b.evaluation).toBe('NO_APTO');
+    expect(b.evaluationReason).toBe('Not useful here');
+    const rereadA = await run(() =>
+      svc.getParticipation(campaignId, prospectId),
+    );
+    const rereadB = await run(() =>
+      svc.getParticipation(campaignB, prospectId),
+    );
+    expect(rereadA.evaluation).toBe('APTO');
+    expect(rereadA.evaluationReason).toBeNull();
+    expect(rereadB.evaluation).toBe('NO_APTO');
+    // The master itself and its campaign A stage are untouched by B's judgement.
+    expect(
+      await db.prospect.findUniqueOrThrow({ where: { id: prospectId } }),
+    ).toMatchObject({ status: 'INACTIVO', campaignId });
+    expect(rereadA.commercialStage).toBe('CONTACTADO');
+  });
+
+  it('AC-C4-03 assigns a different responsible per campaign for the same master', async () => {
+    const prospectId = prospectIds[0];
+    const assignedA = await run(() =>
+      svc.assignResponsible(campaignId, prospectId, actor),
+    );
+    const assignedB = await run(() =>
+      svc.assignResponsible(campaignB, prospectId, responsibleId),
+    );
+    expect(assignedA.responsibleId).toBe(actor);
+    expect(assignedB.responsibleId).toBe(responsibleId);
+    const rows = await db.campaignProspect.findMany({
+      where: { prospectId },
+      orderBy: { campaignId: 'asc' },
+    });
+    const byCampaign = new Map(rows.map((row) => [row.campaignId, row]));
+    expect(byCampaign.get(campaignId)!.responsibleId).toBe(actor);
+    expect(byCampaign.get(campaignB)!.responsibleId).toBe(responsibleId);
+    // Each campaign reports only its own assignment, never the other tenant's user.
+    const dashboardA = await run(() => svc.dashboard(campaignId));
+    const dashboardB = await run(() => svc.dashboard(campaignB));
+    expect(dashboardA.responsibility[actor]).toBe(1);
+    expect(dashboardA.responsibility[responsibleId]).toBeUndefined();
+    expect(dashboardB.responsibility[responsibleId]).toBe(1);
+    expect(dashboardB.responsibility[actor]).toBeUndefined();
+    expect(
+      (await run(() => svc.getParticipation(campaignId, prospectId)))
+        .responsible,
+    ).toMatchObject({ id: actor, eligible: true });
+  });
+
+  it('AC-C8-01 keeps separate dashboard totals for a master shared by two campaigns', async () => {
+    const shared = prospectIds[0];
+    expect(
+      await db.campaignProspect.count({
+        where: { campaignId, prospectId: shared },
+      }),
+    ).toBe(1);
+    expect(
+      await db.campaignProspect.count({
+        where: { campaignId: campaignB, prospectId: shared },
+      }),
+    ).toBe(1);
+    await run(() => svc.updateStage(campaignB, shared, 'CERRADO'));
+    const dashboardA = await run(() => svc.dashboard(campaignId));
+    const dashboardB = await run(() => svc.dashboard(campaignB));
+    expect(dashboardA.total).toBe(3);
+    expect(dashboardB.total).toBe(2);
+    // The shared master is counted once per campaign, never twice inside one.
+    expect(dashboardA.stages.CERRADO).toBe(0);
+    expect(dashboardB.stages.CERRADO).toBe(1);
+    expect(dashboardA.stages.CONTACTADO).toBe(3);
+  });
+
+  it('AC-C3-04 stores a manual activity as a human record without delivery claims', async () => {
+    const prospectId = prospectIds[0];
+    const created = await run(() =>
+      svc.createActivity(campaignId, prospectId, {
+        type: 'CALL',
+        content: 'Called the business, no answer',
+        declaredAt: '2026-01-10T11:00:00Z',
+      }),
+    );
+    expect(created).toMatchObject({
+      type: 'CALL',
+      content: 'Called the business, no answer',
+      actorUserId: actor,
+      tenantId,
+    });
+    // No transport/delivery metadata exists: the platform only records the report.
+    for (const field of [
+      'sentAt',
+      'deliveredAt',
+      'providerMessageId',
+      'status',
+      'channel',
+    ]) {
+      expect(created).not.toHaveProperty(field);
+    }
+    const stored = await db.campaignActivity.findUniqueOrThrow({
+      where: { id: created.id },
+    });
+    expect(Object.keys(stored).sort()).toEqual(
+      [
+        'actorUserId',
+        'campaignId',
+        'content',
+        'correctsId',
+        'declaredAt',
+        'id',
+        'newValue',
+        'previousValue',
+        'reason',
+        'recordedAt',
+        'tenantId',
+        'type',
+        'prospectId',
+      ].sort(),
+    );
+    expect(stored.content).toBe('Called the business, no answer');
+  });
+
   it.each(['membership', 'inactive'])(
     'computes eligibility after %s loss without rewriting assignment/history',
     async (loss) => {
@@ -413,6 +542,139 @@ describe('Campaign read capabilities on disposable PostgreSQL', () => {
     },
   );
 
+  // Every participation in these fixtures is created atomically with exactly
+  // one automatic event and no manual activity. Any consistent snapshot must
+  // therefore satisfy equality, not a lower bound: a mixed-instant read shows
+  // more events than participations (or the reverse).
+  const assertOneSnapshot = (
+    result: Awaited<ReturnType<CampaignsService['dashboard']>>,
+    expected: number,
+  ) => {
+    const sum = (values: Record<string, number>) =>
+      Object.values(values).reduce((a, b) => a + b, 0);
+    expect(result.total).toBe(expected);
+    expect(sum(result.stages)).toBe(expected);
+    expect(sum(result.evaluations)).toBe(expected);
+    expect(sum(result.responsibility)).toBe(expected);
+    expect(Object.values(result.incorporation).reduce((a, b) => a + b, 0)).toBe(
+      expected,
+    );
+    expect(result.activity.manual).toBe(0);
+    expect(result.activity.events).toBe(expected);
+    expect(result.activity.total).toBe(expected);
+  };
+
+  it('keeps one snapshot when a writer commits between the two activity counts', async () => {
+    const target = await db.campaign.create({
+      data: { tenantId, createdBy: actor, name: 'Gated snapshot' },
+    });
+    const seed = async (name: string) => {
+      const prospect = await db.prospect.create({
+        data: { tenantId, campaignId: target.id, name, source: 'manual' },
+      });
+      await db.$transaction([
+        db.campaignProspect.create({
+          data: { campaignId: target.id, prospectId: prospect.id },
+        }),
+        db.campaignActivity.create({
+          data: {
+            tenantId,
+            campaignId: target.id,
+            prospectId: prospect.id,
+            type: 'ASSOCIATION',
+            actorUserId: actor,
+          },
+        }),
+      ]);
+    };
+    await seed('Seeded A');
+    await seed('Seeded B');
+
+    // Gate the second count until a writer has committed, so a sequential
+    // implementation must observe two different instants. The proxy serves both
+    // shapes: a root client (no transaction) and a transaction client.
+    let countCalls = 0;
+    let whenSecondCount!: () => void;
+    const secondCountStarted = new Promise<void>((resolve) => {
+      whenSecondCount = resolve;
+    });
+    let releaseSecondCount!: () => void;
+    const secondCountGate = new Promise<void>((resolve) => {
+      releaseSecondCount = resolve;
+    });
+    // Keep member access through a proxy typed as `unknown`: Prisma delegates
+    // are closures, so binding the owner preserves their behaviour.
+    const bindMember = (member: unknown, owner: object): unknown =>
+      typeof member === 'function'
+        ? (member as (...args: unknown[]) => unknown).bind(owner)
+        : member;
+    type ActivityClient = {
+      count: (...args: unknown[]) => Promise<number>;
+    };
+    const gateActivity = (activity: ActivityClient) =>
+      new Proxy(activity, {
+        get(targetActivity, property: string | symbol) {
+          if (property === 'count') {
+            return async (...args: unknown[]) => {
+              countCalls += 1;
+              if (countCalls === 1) {
+                whenSecondCount();
+                await secondCountGate;
+              }
+              return targetActivity.count(...args);
+            };
+          }
+          return bindMember(
+            Reflect.get(targetActivity, property),
+            targetActivity,
+          );
+        },
+      });
+    type PrismaLike = {
+      campaignActivity: ActivityClient;
+      $transaction: (fn: unknown, options?: unknown) => Promise<unknown>;
+    };
+    const gatedPrisma = new Proxy(db, {
+      get(target, property: string | symbol) {
+        if (property === 'campaignActivity')
+          return gateActivity(target.campaignActivity);
+        if (property === '$transaction')
+          return (inner: unknown, options?: unknown) => {
+            // Calling through the real client keeps Prisma's `this` binding.
+            const runTransaction = (fn: unknown, opts?: unknown) =>
+              (target.$transaction as unknown as PrismaLike['$transaction'])(
+                fn,
+                opts,
+              );
+            if (typeof inner !== 'function')
+              return runTransaction(inner, options);
+            return runTransaction(async (client: unknown) => {
+              const clientScope = client as {
+                campaignActivity: ActivityClient;
+              };
+              return (inner as (value: unknown) => Promise<unknown>)({
+                ...(client as object),
+                campaignActivity: gateActivity(clientScope.campaignActivity),
+              });
+            }, options);
+          };
+        return bindMember(Reflect.get(target, property, target), target);
+      },
+    });
+    const gatedService = new CampaignsService(gatedPrisma, context);
+
+    const pending = run(() => gatedService.dashboard(target.id));
+    await secondCountStarted;
+    await seed('Committed between the counts');
+    releaseSecondCount();
+    const result = await pending;
+
+    // The write committed after the snapshot was taken stays invisible.
+    assertOneSnapshot(result, 2);
+    // A later read does see it, proving the gate actually wrote.
+    assertOneSnapshot(await run(() => svc.dashboard(target.id)), 3);
+  });
+
   it('returns dashboard totals from one snapshot while participations are added concurrently', async () => {
     const target = await db.campaign.create({
       data: { tenantId, createdBy: actor, name: 'Concurrent dashboard' },
@@ -444,32 +706,15 @@ describe('Campaign read capabilities on disposable PostgreSQL', () => {
     const check = (
       result: Awaited<ReturnType<CampaignsService['dashboard']>>,
     ) => {
-      const stageTotal = Object.values(result.stages).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      const evaluationTotal = Object.values(result.evaluations).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      const responsibilityTotal = Object.values(result.responsibility).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      const incorporationTotal = Object.values(result.incorporation).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      expect(stageTotal).toBe(result.total);
-      expect(evaluationTotal).toBe(result.total);
-      expect(responsibilityTotal).toBe(result.total);
-      expect(incorporationTotal).toBe(result.total);
-      // Every participation of this fixture carries one automatic event.
-      expect(result.activity.events).toBeGreaterThanOrEqual(result.total);
-      expect(result.activity.manual).toBeGreaterThanOrEqual(0);
-      expect(result.activity.events).toBe(
-        result.activity.total - result.activity.manual,
-      );
+      const sum = (values: Record<string, number>) =>
+        Object.values(values).reduce((a, b) => a + b, 0);
+      expect(sum(result.stages)).toBe(result.total);
+      expect(sum(result.evaluations)).toBe(result.total);
+      expect(sum(result.responsibility)).toBe(result.total);
+      expect(sum(result.incorporation)).toBe(result.total);
+      expect(result.activity.manual).toBe(0);
+      expect(result.activity.events).toBe(result.total);
+      expect(result.activity.total).toBe(result.total);
     };
     const writers = Array.from({ length: 20 }, async (_, index) => {
       const prospect = await db.prospect.create({
