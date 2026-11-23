@@ -425,7 +425,7 @@ paths:
     get:
       tags: [Campaigns]
       summary: Dashboard operativo de una campaña
-      description: 'ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. Agregados actuales de participaciones de la campaña; no es el dashboard global. responsibility usa SIN_ASIGNAR o NO_ELEGIBLE:{userId} según estado del usuario y membresía actual del tenant. activity.manual cuenta NOTE/CALL/EMAIL/MEETING/OTHER; activity.events cuenta el resto, incluidas correcciones. Todos los agregados se leen de una misma instantánea: un cambio concurrente aparece completo en la consulta siguiente, nunca repartido entre campos.'
+      description: 'ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. Agregados actuales de participaciones de la campaña; no es el dashboard global. responsibility usa SIN_ASIGNAR o NO_ELEGIBLE:{userId} según estado del usuario y membresía actual del tenant. activity.manual cuenta NOTE/CALL/EMAIL/MEETING/OTHER y CORRECTION, porque una corrección es una declaración humana sobre una entrada previa; activity.events cuenta el resto de los tipos registrados (asociación, cambio de etapa, evaluación y responsable). activity.total = activity.manual + activity.events. Todos los agregados se leen de una misma instantánea: un cambio concurrente aparece completo en la consulta siguiente, nunca repartido entre campos.'
       operationId: getCampaignDashboard
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -554,7 +554,7 @@ paths:
     post:
       tags: [Campaigns, Prospects]
       summary: Registra una actividad manual o corrección referenciada
-      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. No envía comunicaciones. correctsId referencia una entrada de la misma participación y genera CORRECTION sin editar el original. declaredAt inválido devuelve 400; recordedAt y actor se asignan en servidor.
+      description: ADMIN, OWNER y MEMBER con tenant seleccionado, incluido ADMIN. No envía comunicaciones. correctsId referencia una entrada de la misma participación y genera CORRECTION sin editar el original. type solo admite declaraciones manuales (NOTE/CALL/EMAIL/MEETING/OTHER); los eventos automáticos (ASSOCIATION/STAGE_CHANGE/EVALUATION_CHANGE/RESPONSIBLE_CHANGE) y MASTER_UPDATE no se aceptan por esta ruta. declaredAt inválido devuelve 400; recordedAt y actor se asignan en servidor.
       operationId: createCampaignParticipationActivity
       x-contract-status: AVAILABLE
       security: [{ bearerAuth: [] }]
@@ -1206,7 +1206,18 @@ components:
     ProspectStatus: { type: string, enum: [ACTIVO, INACTIVO] }
     CommercialStage: { type: string, enum: [SIN_GESTIONAR, EN_INVESTIGACION, CONTACTADO, EN_SEGUIMIENTO, OPORTUNIDAD, CERRADO] }
     CommercialEvaluation: { type: string, enum: [SIN_EVALUAR, APTO, NO_APTO] }
-    CampaignActivityType: { type: string, enum: [NOTE, CALL, EMAIL, MEETING, OTHER, ASSOCIATION, STAGE_CHANGE, EVALUATION_CHANGE, RESPONSIBLE_CHANGE, CORRECTION] }
+    CampaignActivityType:
+      type: string
+      description: >-
+        Tipo de actividad de una participación. NOTE/CALL/EMAIL/MEETING/OTHER son
+        declaraciones manuales admitidas por el alta de actividades; CORRECTION se
+        genera al enviar correctsId y también cuenta como actividad manual.
+        ASSOCIATION/STAGE_CHANGE/EVALUATION_CHANGE/RESPONSIBLE_CHANGE son eventos
+        automáticos. MASTER_UPDATE existe en el esquema persistido y se documenta
+        por paridad, pero la implementación actual no lo genera: incluirlo en el
+        contrato no habilita su creación ni anuncia emisión futura. No confundir
+        con MASTER_UPDATED, que es un evento de procedencia global (ProspectProvenanceType).
+      enum: [NOTE, CALL, EMAIL, MEETING, OTHER, ASSOCIATION, STAGE_CHANGE, EVALUATION_CHANGE, RESPONSIBLE_CHANGE, CORRECTION, MASTER_UPDATE]
     ProspectProvenanceType: { type: string, enum: [CREATED, LINKED, REAPPEARED, MASTER_UPDATED] }
     ProspectingJobStatus: { type: string, enum: [QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED] }
     Tenant:
@@ -1330,7 +1341,10 @@ components:
       additionalProperties: false
       required: [type, content]
       properties:
-        type: { type: string, enum: [NOTE, CALL, EMAIL, MEETING, OTHER] }
+        type:
+          type: string
+          description: Solo declaraciones manuales. Los eventos automáticos y MASTER_UPDATE se rechazan con 400.
+          enum: [NOTE, CALL, EMAIL, MEETING, OTHER]
         content: { type: string, pattern: '\S', maxLength: 5000 }
         declaredAt: { type: string }
         correctsId: { type: string, maxLength: 128 }

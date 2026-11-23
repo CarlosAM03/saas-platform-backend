@@ -633,12 +633,17 @@ export class CampaignsService {
               },
             },
           });
+          // Manual declarations include CORRECTION: a correction is written by a
+          // human referencing a previous entry, so it counts as manual activity.
+          // Automatic events (ASSOCIATION/STAGE_CHANGE/EVALUATION_CHANGE/
+          // RESPONSIBLE_CHANGE) stay in events = total - manual.
           const manualTypes = [
             CampaignActivityType.NOTE,
             CampaignActivityType.CALL,
             CampaignActivityType.EMAIL,
             CampaignActivityType.MEETING,
             CampaignActivityType.OTHER,
+            CampaignActivityType.CORRECTION,
           ];
           const [activities, manualActivities] = await Promise.all([
             tx.campaignActivity.count({

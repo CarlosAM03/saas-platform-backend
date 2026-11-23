@@ -663,6 +663,74 @@ describe('Campaign read capabilities on disposable PostgreSQL', () => {
     expect(page.data.some((row) => row.id === original.id)).toBe(true);
   });
 
+  it('counts a human correction as manual activity and keeps automatic events apart', async () => {
+    // Dedicated campaign so the aggregate is exact, not relative to fixtures.
+    const target = await db.campaign.create({
+      data: { tenantId, createdBy: actor, name: 'Correction counters' },
+    });
+    const prospect = await db.prospect.create({
+      data: {
+        tenantId,
+        campaignId: target.id,
+        name: 'Correction fixture',
+        source: 'manual',
+      },
+    });
+    await db.campaignProspect.create({
+      data: { campaignId: target.id, prospectId: prospect.id },
+    });
+    // One automatic event (association) plus one manual declaration and its
+    // referenced correction, which is also a human declaration.
+    await db.campaignActivity.create({
+      data: {
+        tenantId,
+        campaignId: target.id,
+        prospectId: prospect.id,
+        type: 'ASSOCIATION',
+        actorUserId: actor,
+      },
+    });
+    const original = await run(() =>
+      svc.createActivity(target.id, prospect.id, {
+        type: 'CALL',
+        content: 'Called at noon',
+      }),
+    );
+    const beforeCorrection = await db.campaignActivity.findUniqueOrThrow({
+      where: { id: original.id },
+    });
+    const correction = await run(() =>
+      svc.createActivity(target.id, prospect.id, {
+        type: 'CORRECTION',
+        content: 'Actually it was 3 pm',
+        correctsId: original.id,
+      }),
+    );
+    expect(correction).toMatchObject({
+      type: 'CORRECTION',
+      correctsId: original.id,
+    });
+    const dashboard = await run(() => svc.dashboard(target.id));
+    expect(dashboard.activity).toEqual({ total: 3, manual: 2, events: 1 });
+    expect(dashboard.activity.total).toBe(
+      dashboard.activity.manual + dashboard.activity.events,
+    );
+    // The corrected original is never rewritten, deleted or reclassified.
+    expect(
+      await db.campaignActivity.findUniqueOrThrow({
+        where: { id: original.id },
+      }),
+    ).toEqual(beforeCorrection);
+    const rows = await db.campaignActivity.findMany({
+      where: { tenantId, campaignId: target.id },
+    });
+    expect(rows.map((row) => row.type).sort()).toEqual([
+      'ASSOCIATION',
+      'CALL',
+      'CORRECTION',
+    ]);
+  });
+
   it('AC-C6-04 filters and paginates hundreds of participations server-side', async () => {
     const bulk = await db.campaign.create({
       data: { tenantId, createdBy: actor, name: 'Bulk campaign' },

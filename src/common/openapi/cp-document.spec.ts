@@ -16,6 +16,7 @@ import type {
 } from '@nestjs/swagger';
 import { ResolveProspectRequest } from '../../prospects/dto/resolve-prospect.request';
 import { CampaignProspectsQuery } from '../../campaigns/dto/campaign-prospects.query';
+import { CreateCampaignActivityRequest } from '../../campaigns/dto/campaign-participation.request';
 import { ProspectHistoryQuery } from '../../prospects/dto/prospect-history.query';
 import { UpdateProspectRequest } from '../../prospects/dto/update-prospect.request';
 import { deploymentDocument } from './deployment-document';
@@ -440,6 +441,75 @@ describe('CP contract schemas and documented capabilities', () => {
     expect(
       document.paths['/api/v1/campaigns/{id}/dashboard'].get!.description,
     ).toContain('instantánea');
+  });
+
+  it('keeps activity type enums aligned with Prisma and restricts manual input', () => {
+    const schemas = document.components!.schemas!;
+    const activityType = schemas.CampaignActivityType as SchemaObject;
+    const prismaSchema = readFileSync('./Prisma/schema.prisma', 'utf8');
+    const block = /enum CampaignActivityType \{([\s\S]*?)\}/.exec(prismaSchema);
+    expect(block).not.toBeNull();
+    const prismaTypes = block![1]
+      .split(/\s+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    // Response enum mirrors the persisted enum, including the reserved value.
+    expect(activityType.enum).toEqual(prismaTypes);
+    expect(prismaTypes).toContain('MASTER_UPDATE');
+    // Documenting the value is parity only; it does not start emitting it.
+    expect(activityType.description).toContain('no lo genera');
+    for (const documented of [
+      'CORRECTION',
+      'ASSOCIATION',
+      'STAGE_CHANGE',
+      'EVALUATION_CHANGE',
+      'RESPONSIBLE_CHANGE',
+    ])
+      expect(activityType.enum).toContain(documented);
+
+    const createRequest =
+      schemas.CreateCampaignActivityRequest as SchemaObject & {
+        properties: Record<string, SchemaObject>;
+      };
+    expect(createRequest.properties.type.enum).toEqual([
+      'NOTE',
+      'CALL',
+      'EMAIL',
+      'MEETING',
+      'OTHER',
+    ]);
+    // Automatic events, corrections and the reserved value are not manual input.
+    for (const rejected of [
+      'ASSOCIATION',
+      'STAGE_CHANGE',
+      'EVALUATION_CHANGE',
+      'RESPONSIBLE_CHANGE',
+      'CORRECTION',
+      'MASTER_UPDATE',
+    ]) {
+      expect(createRequest.properties.type.enum).not.toContain(rejected);
+      const errors = validateSync(
+        plainToInstance(CreateCampaignActivityRequest, {
+          type: rejected,
+          content: 'Synthetic',
+        }),
+      );
+      expect(errors.some((error) => error.property === 'type')).toBe(true);
+    }
+    for (const accepted of ['NOTE', 'CALL', 'EMAIL', 'MEETING', 'OTHER']) {
+      expect(
+        validateSync(
+          plainToInstance(CreateCampaignActivityRequest, {
+            type: accepted,
+            content: 'Synthetic',
+          }),
+        ),
+      ).toHaveLength(0);
+    }
+    // The dashboard contract explains the manual/event partition explicitly.
+    const dashboard = document.paths['/api/v1/campaigns/{id}/dashboard'].get!;
+    expect(dashboard.description).toContain('CORRECTION');
+    expect(dashboard.description).toContain('activity.manual');
   });
 
   it('serves current deployment CP paths and schemas through isolated Swagger HTTP without DB', async () => {
