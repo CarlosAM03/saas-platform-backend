@@ -441,8 +441,13 @@ export class CampaignsService {
   ) {
     const tenantId = this.context.requireTenantId();
     const actorUserId = this.context.getRequiredContext().userId;
-    return this.prisma.$transaction(async (tx) => {
+    const assign = async (tx: Prisma.TransactionClient) => {
+      if (responsibleId)
+        await tx.$executeRaw`SET LOCAL lock_timeout = '2500ms'`;
       await this.lockParticipation(tx, tenantId, campaignId, prospectId);
+      if (responsibleId) {
+        await this.lockEligibleResponsible(tx, tenantId, responsibleId);
+      }
       const current = await tx.campaignProspect.findFirst({
         where: {
           campaignId,
@@ -457,21 +462,6 @@ export class CampaignsService {
         },
       });
       if (!current) throw new NotFoundException('Participation not found');
-      if (responsibleId) {
-        const eligible = await tx.userTenant.findFirst({
-          where: {
-            tenantId,
-            userId: responsibleId,
-            user: { status: 'ACTIVO' },
-          },
-          select: { userId: true },
-        });
-        if (!eligible) {
-          throw new BadRequestException(
-            'Responsible must be active and belong to the tenant',
-          );
-        }
-      }
       if (current.responsibleId === responsibleId)
         return withResponsibleEligibility(current);
       const updated = await tx.campaignProspect.update({
@@ -497,7 +487,40 @@ export class CampaignsService {
         },
       });
       return withResponsibleEligibility(updated);
+    };
+    return this.prisma.$transaction(assign, {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
     });
+  }
+
+  private async lockEligibleResponsible(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    userId: string,
+  ): Promise<void> {
+    // Match Users' lock order: user, then membership. Lock only a user with a
+    // membership in this tenant. Recheck that membership after locking the user.
+    const users = await tx.$queryRaw<{ id: string }[]>`
+      SELECT u.id
+      FROM users AS u
+      WHERE u.id = ${userId} AND u.status = 'ACTIVO'
+        AND EXISTS (
+          SELECT 1 FROM user_tenants AS m
+          WHERE m.user_id = u.id AND m.tenant_id = ${tenantId}
+        )
+      FOR SHARE OF u
+    `;
+    if (users.length > 0) {
+      const memberships = await tx.$queryRaw<{ user_id: string }[]>`
+        SELECT user_id FROM user_tenants
+        WHERE user_id = ${userId} AND tenant_id = ${tenantId}
+        FOR SHARE
+      `;
+      if (memberships.length > 0) return;
+    }
+    throw new BadRequestException(
+      'Responsible must be active and belong to the tenant',
+    );
   }
 
   async activities(

@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -130,6 +130,258 @@ describe('CP review regressions on disposable PostgreSQL', () => {
 
   afterAll(async () => {
     if (db) await db.$disconnect();
+  });
+
+  const revocations = ['status', 'membership'] as const;
+  type Revocation = (typeof revocations)[number];
+
+  async function revoke(tx: Prisma.TransactionClient, kind: Revocation) {
+    if (kind === 'status') {
+      await tx.user.update({
+        where: { id: secondUser },
+        data: { status: 'INACTIVO' },
+      });
+    } else {
+      await tx.userTenant.delete({
+        where: { userId_tenantId: { userId: secondUser, tenantId } },
+      });
+    }
+  }
+
+  function hold(write: (tx: Prisma.TransactionClient) => Promise<unknown>) {
+    const ready = deferred();
+    const release = deferred();
+    const transaction = db.$transaction(
+      async (tx) => {
+        await write(tx);
+        ready.resolve();
+        await release.promise;
+      },
+      { timeout: 15000 },
+    );
+    return {
+      ready: Promise.race([ready.promise, transaction]),
+      release,
+      transaction,
+    };
+  }
+
+  async function tag(tx: Prisma.TransactionClient, label: string) {
+    await tx.$queryRaw`SELECT set_config('application_name', ${label}, true)`;
+  }
+
+  function assignment(label: string) {
+    const tagged = {
+      $transaction: (
+        callback: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        options?: { isolationLevel: Prisma.TransactionIsolationLevel },
+      ) =>
+        db.$transaction(async (tx) => {
+          await tag(tx, label);
+          return callback(tx);
+        }, options),
+    } as unknown as PrismaService;
+    const svc = new CampaignsService(tagged, context);
+    return run(() => svc.assignResponsible(campaignId, prospectId, secondUser));
+  }
+
+  async function waitForLock(label: string, operation: Promise<unknown>) {
+    const finished = operation.then(
+      () => 'finished',
+      () => 'finished',
+    );
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      const [row] = await db.$queryRaw<{ waiting: boolean }[]>`
+        SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity
+          WHERE application_name = ${label}
+            AND datname = current_database()
+            AND cardinality(pg_blocking_pids(pid)) > 0
+        ) AS waiting
+      `;
+      if (row.waiting) return 'blocked';
+      const result = await Promise.race([
+        finished,
+        new Promise<undefined>((done) => setTimeout(done, 10)),
+      ]);
+      if (result) return result;
+    }
+    return 'unobserved';
+  }
+
+  const responsibilityEvents = () =>
+    db.campaignActivity.findMany({
+      where: { tenantId, campaignId, prospectId, type: 'RESPONSIBLE_CHANGE' },
+      select: { previousValue: true, newValue: true, actorUserId: true },
+    });
+
+  it.each(revocations)(
+    'CP-02: %s revocation before assignment rejects without writes',
+    async (kind) => {
+      const blocker = hold((tx) => revoke(tx, kind));
+      try {
+        await blocker.ready;
+        const label = `cp02-${randomUUID()}`;
+        const write = assignment(label);
+        const checks = Promise.allSettled([write]);
+        try {
+          expect(await waitForLock(label, write)).toBe('blocked');
+          blocker.release.resolve();
+          await blocker.transaction;
+          await expect(write).rejects.toBeInstanceOf(BadRequestException);
+          expect(
+            await db.campaignProspect.findUniqueOrThrow({
+              where: participationWhere(),
+            }),
+          ).toMatchObject({ responsibleId: null });
+          expect(await responsibilityEvents()).toEqual([]);
+        } finally {
+          blocker.release.resolve();
+          await checks;
+        }
+      } finally {
+        blocker.release.resolve();
+        await Promise.allSettled([blocker.transaction]);
+      }
+    },
+  );
+
+  it.each(revocations)(
+    'CP-02: assignment commits before %s revocation and preserves history',
+    async (kind) => {
+      // Pause the real assignment at its activity insert, after the eligibility read.
+      const blocker = hold(
+        (tx) => tx.$executeRaw`LOCK TABLE campaign_activities IN SHARE MODE`,
+      );
+      try {
+        await blocker.ready;
+        const writer = `cp02-${randomUUID()}`;
+        const write = assignment(writer);
+        const writes = Promise.allSettled([write]);
+        try {
+          expect(await waitForLock(writer, write)).toBe('blocked');
+          const revoker = `cp02-${randomUUID()}`;
+          const revoked = db.$transaction(async (tx) => {
+            await tag(tx, revoker);
+            await revoke(tx, kind);
+          });
+          const outcomes = Promise.allSettled([revoked]);
+          try {
+            expect(await waitForLock(revoker, revoked)).toBe('blocked');
+            blocker.release.resolve();
+            await blocker.transaction;
+            await expect(write).resolves.toMatchObject({
+              responsibleId: secondUser,
+              responsible: { eligible: true },
+            });
+            await revoked;
+            const current = await run(() =>
+              service().getParticipation(campaignId, prospectId),
+            );
+            expect(current).toMatchObject({
+              responsibleId: secondUser,
+              responsible: { eligible: false },
+            });
+            expect(await responsibilityEvents()).toEqual([
+              { previousValue: null, newValue: secondUser, actorUserId: actor },
+            ]);
+          } finally {
+            blocker.release.resolve();
+            await outcomes;
+          }
+        } finally {
+          blocker.release.resolve();
+          await writes;
+        }
+      } finally {
+        blocker.release.resolve();
+        await Promise.allSettled([blocker.transaction]);
+      }
+    },
+  );
+
+  it('CP-02: lock timeout rolls back assignment and permits a clean retry', async () => {
+    const blocker = hold(
+      (tx) => tx.$executeRaw`LOCK TABLE campaign_activities IN SHARE MODE`,
+    );
+    try {
+      await blocker.ready;
+      const label = `cp02-${randomUUID()}`;
+      const write = assignment(label);
+      const checks = Promise.allSettled([write]);
+      try {
+        expect(await waitForLock(label, write)).toBe('blocked');
+        await expect(write).rejects.toThrow(/lock timeout/i);
+        expect(
+          await db.campaignProspect.findUniqueOrThrow({
+            where: participationWhere(),
+          }),
+        ).toMatchObject({ responsibleId: null });
+        expect(await responsibilityEvents()).toEqual([]);
+      } finally {
+        blocker.release.resolve();
+        await checks;
+      }
+      await blocker.transaction;
+      await expect(
+        run(() =>
+          service().assignResponsible(campaignId, prospectId, secondUser),
+        ),
+      ).resolves.toMatchObject({ responsibleId: secondUser });
+      expect(await responsibilityEvents()).toEqual([
+        { previousValue: null, newValue: secondUser, actorUserId: actor },
+      ]);
+    } finally {
+      blocker.release.resolve();
+      await Promise.allSettled([blocker.transaction]);
+    }
+  }, 10000);
+
+  it('CP-02: removing the same user from another tenant does not block assignment', async () => {
+    const foreign = await db.tenant.create({
+      data: {
+        name: 'Synthetic foreign tenant',
+        slug: `cp02-foreign-${randomUUID()}`,
+      },
+    });
+    try {
+      const role = await db.role.create({
+        data: { tenantId: foreign.id, name: 'MEMBER' },
+      });
+      const membership = { userId: secondUser, tenantId: foreign.id };
+      await db.userTenant.create({ data: { ...membership, roleId: role.id } });
+      const blocker = hold((tx) =>
+        tx.userTenant.delete({ where: { userId_tenantId: membership } }),
+      );
+      try {
+        await blocker.ready;
+        const label = `cp02-${randomUUID()}`;
+        const write = assignment(label);
+        const checks = Promise.allSettled([write]);
+        try {
+          expect(await waitForLock(label, write)).toBe('finished');
+          await expect(write).resolves.toMatchObject({
+            responsibleId: secondUser,
+            responsible: { eligible: true },
+          });
+        } finally {
+          blocker.release.resolve();
+          await checks;
+        }
+        await blocker.transaction;
+        expect(await responsibilityEvents()).toEqual([
+          { previousValue: null, newValue: secondUser, actorUserId: actor },
+        ]);
+      } finally {
+        blocker.release.resolve();
+        await Promise.allSettled([blocker.transaction]);
+      }
+    } finally {
+      await db.userTenant.deleteMany({ where: { tenantId: foreign.id } });
+      await db.role.deleteMany({ where: { tenantId: foreign.id } });
+      await db.tenant.delete({ where: { id: foreign.id } });
+    }
   });
 
   /**
