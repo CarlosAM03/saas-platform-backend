@@ -13,6 +13,7 @@ El owner aceptó G4 sobre `3b5eec6fa99f846e853794fc8aedff2c4353c269` y autorizó
 - Integridad del arnés: con autorización del owner (opción A, 2026-11-23) se refrescó el hash de `06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv` en `MANIFEST_INTEGRIDAD.json`, con bloque `lastAuthorizedRefresh` y sin tocar otros hashes. Verificación vigente: `Checked 27 files; anomalies: 0`. Detalle en `ARNES_ANDRE_3B5EEC6.md`.
 - Riesgos abiertos: `T32` sigue `NOT_RUN` y es responsabilidad del frontend; la base Flutter y el momento de uso son decisión del owner; `MASTER_UPDATE` está documentado pero no se emite; `CORRECTION` cuenta como actividad manual; no existe endpoint de reversión de importaciones (rollback transaccional). Cualquier commit backend no documental invalida la atribución de este arnés.
 - No se generó ZIP de entrega ni se modificó el repositorio Flutter. G6 continúa pendiente de la revisión del owner.
+- **CI:** el check `quality` falló al publicar la rama porque `verify-contract.cjs` exigía 33 operaciones vivas y el sprint añadió 13 revisadas; además `lint:check` detectó finales de línea mezclados en cinco archivos. Corregido en `b79209a` (guard con allowlist explícita + normalización de formato). Reproducción local de los tres jobs de CI en verde; el push del commit y la confirmación en GitHub Actions corresponden al owner. Evidencia: `CI_QUALITY_FIX_B79209A.md`.
 
 ## Sincronización — 2026-11-23 (O4-B / O5-A aplicadas)
 
