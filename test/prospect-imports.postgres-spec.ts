@@ -114,7 +114,19 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
       await service.confirm(campaignId, csv, initial.previewReference, create);
 
       const first = await service.preview(campaignId, csv);
-      await service.confirm(campaignId, csv, first.previewReference, link);
+      const confirmations = await Promise.allSettled([
+        service.confirm(campaignId, csv, first.previewReference, link),
+        service.confirm(campaignId, csv, first.previewReference, link),
+      ]);
+      expect(confirmations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ status: 'fulfilled' }),
+          expect.objectContaining({
+            status: 'rejected',
+            reason: expect.objectContaining({ status: 409 }),
+          }),
+        ]),
+      );
       await expect(
         service.confirm(campaignId, csv, first.previewReference, link),
       ).rejects.toThrow('new preview');

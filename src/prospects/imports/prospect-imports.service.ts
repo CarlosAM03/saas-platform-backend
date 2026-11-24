@@ -335,11 +335,17 @@ export class ProspectImportsService {
           ...candidateSelect.campaignProspects,
           where: { campaign: { tenantId } },
         },
-        provenanceEvents: {
-          where: { tenantId, campaignId, source: 'csv', type: 'REAPPEARED' },
-          orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
-          take: 1,
-          select: { id: true },
+        _count: {
+          select: {
+            provenanceEvents: {
+              where: {
+                tenantId,
+                campaignId,
+                source: 'csv',
+                type: 'REAPPEARED',
+              },
+            },
+          },
         },
       },
       orderBy: { id: 'asc' },
@@ -395,14 +401,10 @@ export class ProspectImportsService {
     });
     // An existing link can record an appearance without changing the master or
     // participation. Include that evidence so its preview cannot be reused.
-    const snapshotCandidates = candidates.map(
-      ({ provenanceEvents, ...candidate }) => {
-        const latestAppearance = provenanceEvents?.[0];
-        return latestAppearance
-          ? { ...candidate, lastCsvAppearanceId: latestAppearance.id }
-          : candidate;
-      },
-    );
+    const snapshotCandidates = candidates.map(({ _count, ...candidate }) => {
+      const csvAppearances = _count?.provenanceEvents;
+      return csvAppearances ? { ...candidate, csvAppearances } : candidate;
+    });
     return {
       rows: classified,
       snapshot: hash(JSON.stringify(snapshotCandidates)),
