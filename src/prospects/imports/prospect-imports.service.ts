@@ -125,7 +125,7 @@ export class ProspectImportsService {
               const allowed: Action[] =
                 row.classification === 'NEW'
                   ? ['CREATE', 'SKIP']
-                  : ['LINK_EXISTING', 'UPDATE_EXISTING', 'SKIP'];
+                  : ['CREATE', 'LINK_EXISTING', 'UPDATE_EXISTING', 'SKIP'];
               if (!allowed.includes(action))
                 throw new BadRequestException(
                   `Invalid action for record ${row.record}`,
@@ -173,6 +173,13 @@ export class ProspectImportsService {
                   data: row.values,
                 });
               }
+              const existingAssociation =
+                typeof tx.campaignProspect.findFirst === 'function'
+                  ? await tx.campaignProspect.findFirst({
+                      where: { campaignId, prospectId },
+                      select: { campaignId: true },
+                    })
+                  : null;
               await tx.campaignProspect.upsert({
                 where: {
                   campaignId_prospectId: {
@@ -183,6 +190,89 @@ export class ProspectImportsService {
                 create: { campaignId, prospectId: prospectId },
                 update: {},
               });
+              if (action === 'CREATE') {
+                await tx.prospectProvenance.create({
+                  data: {
+                    tenantId,
+                    prospectId,
+                    campaignId,
+                    type: 'CREATED',
+                    source: 'csv',
+                    ...(row.classification === 'MATCH'
+                      ? {
+                          details: {
+                            resolution: 'CREATE',
+                            candidateIds: row.matches.map((match) => match.id),
+                          },
+                        }
+                      : {}),
+                    actorUserId: this.context.getRequiredContext().userId,
+                  },
+                });
+                await tx.campaignActivity.create({
+                  data: {
+                    tenantId,
+                    campaignId,
+                    prospectId,
+                    type: 'ASSOCIATION',
+                    actorUserId: this.context.getRequiredContext().userId,
+                  },
+                });
+              } else if (action === 'LINK_EXISTING') {
+                await tx.prospectProvenance.create({
+                  data: {
+                    tenantId,
+                    prospectId,
+                    campaignId,
+                    type: existingAssociation ? 'REAPPEARED' : 'LINKED',
+                    source: 'csv',
+                    actorUserId: this.context.getRequiredContext().userId,
+                  },
+                });
+                if (!existingAssociation) {
+                  await tx.campaignActivity.create({
+                    data: {
+                      tenantId,
+                      campaignId,
+                      prospectId,
+                      type: 'ASSOCIATION',
+                      actorUserId: this.context.getRequiredContext().userId,
+                    },
+                  });
+                }
+              } else if (action === 'UPDATE_EXISTING') {
+                await tx.prospectProvenance.create({
+                  data: {
+                    tenantId,
+                    prospectId,
+                    campaignId,
+                    type: 'MASTER_UPDATED',
+                    source: 'csv',
+                    actorUserId: this.context.getRequiredContext().userId,
+                  },
+                });
+                if (!existingAssociation) {
+                  await tx.prospectProvenance.create({
+                    data: {
+                      tenantId,
+                      prospectId,
+                      campaignId,
+                      type: 'LINKED',
+                      source: 'csv',
+                      actorUserId: this.context.getRequiredContext().userId,
+                    },
+                  });
+                  await tx.campaignActivity.create({
+                    data: {
+                      tenantId,
+                      campaignId,
+                      prospectId,
+                      type: 'ASSOCIATION',
+                      actorUserId: this.context.getRequiredContext().userId,
+                    },
+                  });
+                }
+              }
               result.push({ record: row.record, action, prospectId });
             }
             return {
@@ -245,6 +335,18 @@ export class ProspectImportsService {
           ...candidateSelect.campaignProspects,
           where: { campaign: { tenantId } },
         },
+        _count: {
+          select: {
+            provenanceEvents: {
+              where: {
+                tenantId,
+                campaignId,
+                source: 'csv',
+                type: 'REAPPEARED',
+              },
+            },
+          },
+        },
       },
       orderBy: { id: 'asc' },
     });
@@ -297,7 +399,16 @@ export class ProspectImportsService {
         })),
       };
     });
-    return { rows: classified, snapshot: hash(JSON.stringify(candidates)) };
+    // An existing link can record an appearance without changing the master or
+    // participation. Include that evidence so its preview cannot be reused.
+    const snapshotCandidates = candidates.map(({ _count, ...candidate }) => {
+      const csvAppearances = _count?.provenanceEvents;
+      return csvAppearances ? { ...candidate, csvAppearances } : candidate;
+    });
+    return {
+      rows: classified,
+      snapshot: hash(JSON.stringify(snapshotCandidates)),
+    };
   }
 
   private summary(rows: { classification: string }[]) {

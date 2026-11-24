@@ -31,7 +31,12 @@ describe('Prospect imports HTTP', () => {
           ),
       },
       prospect: { findMany: jest.fn().mockResolvedValue([]), create },
-      campaignProspect: { upsert: jest.fn().mockResolvedValue({}) },
+      campaignProspect: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      prospectProvenance: { create: jest.fn().mockResolvedValue({}) },
+      campaignActivity: { create: jest.fn().mockResolvedValue({}) },
     });
     Object.assign(client, {
       $transaction: (fn: (tx: typeof client) => unknown) => fn(client),

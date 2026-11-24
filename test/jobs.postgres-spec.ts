@@ -132,7 +132,9 @@ describe('Baseline data and disabled Jobs with PostgreSQL (isolated fixtures)', 
     if (!prisma) return;
     // Delete only the exact fixture IDs created by this suite, never truncate.
     const where = { tenantId: { in: tenantIds } };
+    await prisma.campaignActivity.deleteMany({ where });
     await prisma.campaignProspect.deleteMany({ where: { campaign: where } });
+    await prisma.prospectProvenance.deleteMany({ where });
     await prisma.prospect.deleteMany({ where });
     await prisma.prospectingJob.deleteMany({ where });
     await prisma.campaign.deleteMany({ where });

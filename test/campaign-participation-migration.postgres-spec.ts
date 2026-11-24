@@ -1,0 +1,226 @@
+import { PrismaClient } from '@prisma/client';
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+
+describe('campaign participation forward migration fix', () => {
+  let admin: PrismaClient;
+  let client: PrismaClient;
+  let schema: string;
+  let url: string;
+  let legacyRows: unknown[];
+
+  const migrate = (file: string, target = url) =>
+    execFileSync(
+      process.execPath,
+      [
+        require.resolve('prisma/build/index.js'),
+        'db',
+        'execute',
+        '--schema',
+        resolve('Prisma/schema.prisma'),
+        '--file',
+        resolve(file),
+      ],
+      { stdio: 'pipe', env: { ...process.env, DATABASE_URL: target } },
+    );
+
+  beforeAll(async () => {
+    if (!process.env.INTEGRATION_TEST_DATABASE_URL)
+      throw new Error('Disposable INTEGRATION_TEST_DATABASE_URL required');
+    admin = new PrismaClient();
+    await admin.$connect();
+  });
+
+  beforeEach(async () => {
+    schema = `campaign_fix_${randomUUID().replace(/-/g, '')}`;
+    await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
+    const databaseUrl = new URL(process.env.INTEGRATION_TEST_DATABASE_URL!);
+    databaseUrl.searchParams.set('schema', schema);
+    url = databaseUrl.href;
+    client = new PrismaClient({ datasources: { db: { url } } });
+
+    migrate('Prisma/migrations/20260909152421_init/migration.sql');
+    await client.$executeRawUnsafe(
+      "INSERT INTO tenants (id, name, slug, updated_at) VALUES ('tenant', 'Tenant synthetic', 'tenant-synthetic', NOW())",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO users (id, name, email, password_hash, updated_at) VALUES ('actor', 'Actor synthetic', 'actor@synthetic.test', 'hash', NOW())",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO campaigns (id, tenant_id, created_by, name, updated_at) VALUES ('campaign', 'tenant', 'actor', 'Campaign synthetic', NOW())",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO prospects (id, tenant_id, campaign_id, name, source, created_at, updated_at) VALUES ('legacy-prospect', 'tenant', 'campaign', 'Legacy synthetic', 'legacy-source', NOW(), NOW())",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO tenants (id, name, slug, updated_at) VALUES ('tenant-b', 'Tenant synthetic', 'tenant-b', NOW())",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO campaigns (id, tenant_id, created_by, name, updated_at) VALUES ('campaign-a2', 'tenant', 'actor', 'Second synthetic', NOW()), ('campaign-b', 'tenant-b', 'actor', 'Campaign synthetic', NOW())",
+    );
+    await client.$executeRawUnsafe(`INSERT INTO prospects
+      (id, tenant_id, campaign_id, name, source, source_identifier, created_at, updated_at) VALUES
+      ('existing', 'tenant', 'campaign', 'Existing', 'manual', NULL, '2025-01-01', '2025-02-01'),
+      ('duplicate-1', 'tenant', 'campaign', 'Duplicate', 'google_maps', 'legacy-place', '2025-01-01', '2025-02-01'),
+      ('duplicate-2', 'tenant', 'campaign-a2', 'Duplicate', 'google_maps', 'legacy-place', '2025-01-01', '2025-02-01'),
+      ('cross-origin', 'tenant', 'campaign-b', 'Cross origin', 'csv', NULL, '2025-01-01', '2025-02-01'),
+      ('tenant-b-prospect', 'tenant-b', 'campaign-b', 'Duplicate', 'manual', NULL, '2025-01-01', '2025-02-01')`);
+    await client.$executeRawUnsafe(
+      "INSERT INTO campaign_prospects (campaign_id, prospect_id, status, added_at) VALUES ('campaign', 'existing', 'LEGACY_UNCHANGED', '2025-01-02')",
+    );
+    legacyRows =
+      await client.$queryRawUnsafe(`SELECT id, tenant_id, campaign_id,
+      source, source_identifier, status, created_at, updated_at FROM prospects ORDER BY id`);
+    migrate(
+      'Prisma/migrations/20261122000100_campaign_participation_sprint/migration.sql',
+    );
+    migrate(
+      'Prisma/migrations/20261123000100_campaign_participation_history_forward_fix/migration.sql',
+    );
+  });
+
+  afterEach(async () => {
+    await client.$disconnect();
+    if (/^campaign_fix_[a-f0-9]{32}$/.test(schema))
+      await admin.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
+  });
+
+  afterAll(async () => {
+    await admin?.$disconnect();
+  });
+
+  it('removes generated legacy provenance without removing the participation', async () => {
+    expect(await client.prospectProvenance.count()).toBe(0);
+    expect(await client.campaignProspect.count()).toBe(5);
+  });
+
+  it('requires both migrations together: the sprint migration alone leaves fabricated provenance', async () => {
+    // Fresh schema to observe the intermediate state, which normal deploys never keep.
+    const partialSchema = `campaign_fix_${randomUUID().replace(/-/g, '')}`;
+    await admin.$executeRawUnsafe(`CREATE SCHEMA "${partialSchema}"`);
+    const partialUrl = new URL(process.env.INTEGRATION_TEST_DATABASE_URL!);
+    partialUrl.searchParams.set('schema', partialSchema);
+    const href = partialUrl.href;
+    const partial = new PrismaClient({ datasources: { db: { url: href } } });
+    try {
+      migrate('Prisma/migrations/20260909152421_init/migration.sql', href);
+      await partial.$executeRawUnsafe(
+        "INSERT INTO tenants (id, name, slug, updated_at) VALUES ('tenant', 'Tenant synthetic', 'tenant-synthetic', NOW())",
+      );
+      await partial.$executeRawUnsafe(
+        "INSERT INTO users (id, name, email, password_hash, updated_at) VALUES ('actor', 'Actor synthetic', 'actor@synthetic.test', 'hash', NOW())",
+      );
+      await partial.$executeRawUnsafe(
+        "INSERT INTO campaigns (id, tenant_id, created_by, name, updated_at) VALUES ('campaign', 'tenant', 'actor', 'Campaign synthetic', NOW())",
+      );
+      await partial.$executeRawUnsafe(
+        "INSERT INTO prospects (id, tenant_id, campaign_id, name, source, created_at, updated_at) VALUES ('legacy-prospect', 'tenant', 'campaign', 'Legacy synthetic', 'legacy-source', NOW(), NOW())",
+      );
+      migrate(
+        'Prisma/migrations/20261122000100_campaign_participation_sprint/migration.sql',
+        href,
+      );
+      // Intermediate state: the sprint migration fabricates a legacy CREATED event.
+      expect(await partial.prospectProvenance.count()).toBe(1);
+      expect(await partial.campaignProspect.count()).toBe(1);
+      migrate(
+        'Prisma/migrations/20261123000100_campaign_participation_history_forward_fix/migration.sql',
+        href,
+      );
+      // Net state after both: no invented history, participation intact.
+      expect(await partial.prospectProvenance.count()).toBe(0);
+      expect(await partial.campaignProspect.count()).toBe(1);
+    } finally {
+      await partial.$disconnect();
+      await admin.$executeRawUnsafe(`DROP SCHEMA "${partialSchema}" CASCADE`);
+    }
+  });
+
+  it('T28 preserves legacy identities, timestamps and constraints without cross-tenant backfill', async () => {
+    expect(
+      await client.$queryRawUnsafe(`SELECT id, tenant_id, campaign_id,
+      source, source_identifier, status, created_at, updated_at FROM prospects ORDER BY id`),
+    ).toEqual(legacyRows);
+    expect(await client.prospect.count()).toBe(6);
+    expect(
+      await client.prospect.count({
+        where: { identitySource: null, identityHash: null },
+      }),
+    ).toBe(6);
+    expect(await client.campaignActivity.count()).toBe(0);
+    expect(await client.prospectProvenance.count()).toBe(0);
+    expect(
+      await client.campaignProspect.count({
+        where: { prospectId: 'cross-origin' },
+      }),
+    ).toBe(0);
+    const existing = await client.campaignProspect.findUniqueOrThrow({
+      where: {
+        campaignId_prospectId: {
+          campaignId: 'campaign',
+          prospectId: 'existing',
+        },
+      },
+    });
+    expect(existing.status).toBe('LEGACY_UNCHANGED');
+    expect(existing.addedAt).toEqual(new Date('2025-01-02T00:00:00.000Z'));
+    for (const row of await client.campaignProspect.findMany()) {
+      expect(row).toMatchObject({
+        commercialStage: 'SIN_GESTIONAR',
+        evaluation: 'SIN_EVALUAR',
+        evaluationReason: null,
+        responsibleId: null,
+      });
+      const campaign = await client.campaign.findUniqueOrThrow({
+        where: { id: row.campaignId },
+      });
+      const prospect = await client.prospect.findUniqueOrThrow({
+        where: { id: row.prospectId },
+      });
+      expect(campaign.tenantId).toBe(prospect.tenantId);
+    }
+    await expect(
+      client.campaignProspect.create({
+        data: { campaignId: 'campaign', prospectId: 'existing' },
+      }),
+    ).rejects.toMatchObject({ code: 'P2002' });
+    await expect(
+      client.prospect.create({
+        data: {
+          tenantId: 'tenant',
+          campaignId: 'campaign',
+          name: 'Forbidden duplicate',
+          source: 'google_maps',
+          sourceIdentifier: 'legacy-place',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'P2002' });
+  });
+
+  it('restricts deletion of participation and prospect when history exists', async () => {
+    await client.$executeRawUnsafe(
+      "INSERT INTO campaign_activities (id, tenant_id, campaign_id, prospect_id, type) VALUES ('activity', 'tenant', 'campaign', 'legacy-prospect', 'NOTE')",
+    );
+    await expect(
+      client.$executeRawUnsafe(
+        "DELETE FROM campaign_prospects WHERE campaign_id = 'campaign' AND prospect_id = 'legacy-prospect'",
+      ),
+    ).rejects.toThrow();
+
+    await client.$executeRawUnsafe(
+      "DELETE FROM campaign_activities WHERE id = 'activity'",
+    );
+    await client.$executeRawUnsafe(
+      "DELETE FROM campaign_prospects WHERE campaign_id = 'campaign' AND prospect_id = 'legacy-prospect'",
+    );
+    await client.$executeRawUnsafe(
+      "INSERT INTO prospect_provenance (id, tenant_id, prospect_id, campaign_id, type, source) VALUES ('confirmed', 'tenant', 'legacy-prospect', 'campaign', 'CREATED', 'manual')",
+    );
+    await expect(
+      client.$executeRawUnsafe(
+        "DELETE FROM prospects WHERE id = 'legacy-prospect'",
+      ),
+    ).rejects.toThrow();
+  });
+});

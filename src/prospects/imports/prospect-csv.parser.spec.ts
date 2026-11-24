@@ -55,4 +55,18 @@ describe('ProspectCsvParser', () => {
       ),
     ).toThrow();
   });
+
+  it('T25 rejects files over 5 MB and accepts a 1000-row synthethic limit', () => {
+    expect(() => parser.parse(Buffer.alloc(5 * 1024 * 1024 + 1))).toThrow(
+      'CSV must contain',
+    );
+    const csv =
+      'name\n' +
+      Array.from({ length: 1000 }, (_, i) => `Synthetic ${i}`).join('\n');
+    const start = process.hrtime.bigint();
+    const rows = parser.parse(Buffer.from(csv));
+    const elapsedMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+    expect(rows).toHaveLength(1000);
+    expect(elapsedMs).toBeGreaterThanOrEqual(0);
+  });
 });

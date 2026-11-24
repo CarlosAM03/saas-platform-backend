@@ -5,10 +5,18 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
+  MaxLength,
   ValidateIf,
 } from 'class-validator';
 
 export class UpdateProspectRequest {
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(128)
+  contextCampaignId?: string;
+
   @ValidateIf((_object, value: unknown) => value !== undefined)
   @IsString()
   name?: string;

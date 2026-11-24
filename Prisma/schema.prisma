@@ -50,6 +50,42 @@ enum ProspectingJobStatus {
   CANCELLED
 }
 
+enum CommercialStage {
+  SIN_GESTIONAR
+  EN_INVESTIGACION
+  CONTACTADO
+  EN_SEGUIMIENTO
+  OPORTUNIDAD
+  CERRADO
+}
+
+enum CommercialEvaluation {
+  SIN_EVALUAR
+  APTO
+  NO_APTO
+}
+
+enum CampaignActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  OTHER
+  ASSOCIATION
+  STAGE_CHANGE
+  EVALUATION_CHANGE
+  RESPONSIBLE_CHANGE
+  CORRECTION
+  MASTER_UPDATE
+}
+
+enum ProspectProvenanceType {
+  CREATED
+  LINKED
+  REAPPEARED
+  MASTER_UPDATED
+}
+
 // ============================================================
 // MODELS
 // ============================================================
@@ -91,6 +127,9 @@ model User {
   userTenants UserTenant[]
   createdCampaigns Campaign[] @relation("CampaignCreator")
   requestedJobs ProspectingJob[] @relation("JobRequester")
+  responsibleParticipations CampaignProspect[] @relation("ParticipationResponsible")
+  campaignActivities CampaignActivity[] @relation("ActivityActor")
+  provenanceEvents ProspectProvenance[] @relation("ProvenanceActor")
 
   @@map("users")
 }
@@ -158,6 +197,8 @@ model Prospect {
   website          String?
   source           String          // ej. "google_maps"
   sourceIdentifier String?         @map("source_identifier")
+  identitySource   String?         @map("identity_source")
+  identityHash     String?         @map("identity_hash")
   language         String?
   status           ProspectStatus  @default(ACTIVO)
   metadata         Json?           // información adicional flexible
@@ -168,23 +209,77 @@ model Prospect {
   tenant           Tenant          @relation(fields: [tenantId], references: [id])
   campaign         Campaign        @relation(fields: [campaignId], references: [id])
   campaignProspects CampaignProspect[]
+  provenanceEvents ProspectProvenance[]
 
   @@unique([tenantId, campaignId, source, sourceIdentifier])
+  @@unique([tenantId, identitySource, identityHash])
+  @@index([tenantId, name])
   @@map("prospects")
 }
 
 model CampaignProspect {
-  campaignId  String   @map("campaign_id")
-  prospectId  String   @map("prospect_id")
-  status      String   @default("ACTIVO") // se puede usar enum más adelante
-  addedAt     DateTime @default(now()) @map("added_at")
+  campaignId       String              @map("campaign_id")
+  prospectId       String              @map("prospect_id")
+  status           String              @default("ACTIVO")
+  commercialStage  CommercialStage     @default(SIN_GESTIONAR) @map("commercial_stage")
+  evaluation       CommercialEvaluation @default(SIN_EVALUAR)
+  evaluationReason String?             @map("evaluation_reason")
+  responsibleId    String?             @map("responsible_id")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  addedAt          DateTime            @default(now()) @map("added_at")
 
   // Relations
   campaign    Campaign @relation(fields: [campaignId], references: [id])
   prospect    Prospect @relation(fields: [prospectId], references: [id])
+  responsible User? @relation("ParticipationResponsible", fields: [responsibleId], references: [id])
+  activities  CampaignActivity[]
 
   @@id([campaignId, prospectId])
+  @@index([campaignId, commercialStage])
+  @@index([campaignId, evaluation])
+  @@index([campaignId, responsibleId])
   @@map("campaign_prospects")
+}
+
+model CampaignActivity {
+  id            String              @id @default(cuid())
+  tenantId      String              @map("tenant_id")
+  campaignId    String              @map("campaign_id")
+  prospectId    String              @map("prospect_id")
+  type          CampaignActivityType
+  content       String?
+  declaredAt    DateTime?           @map("declared_at")
+  recordedAt    DateTime            @default(now()) @map("recorded_at")
+  actorUserId   String?             @map("actor_user_id")
+  previousValue String?             @map("previous_value")
+  newValue      String?             @map("new_value")
+  reason        String?
+  correctsId    String?             @map("corrects_id")
+
+  participation CampaignProspect @relation(fields: [campaignId, prospectId], references: [campaignId, prospectId], onDelete: Restrict)
+  actor         User? @relation("ActivityActor", fields: [actorUserId], references: [id])
+
+  @@index([tenantId, campaignId, prospectId, recordedAt])
+  @@index([campaignId, recordedAt])
+  @@map("campaign_activities")
+}
+
+model ProspectProvenance {
+  id          String                 @id @default(cuid())
+  tenantId    String                 @map("tenant_id")
+  prospectId  String                 @map("prospect_id")
+  campaignId  String?                @map("campaign_id")
+  type        ProspectProvenanceType
+  source      String
+  actorUserId String?                @map("actor_user_id")
+  recordedAt  DateTime               @default(now()) @map("recorded_at")
+  details     Json?
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Restrict)
+  actor    User? @relation("ProvenanceActor", fields: [actorUserId], references: [id])
+
+  @@index([tenantId, prospectId, recordedAt])
+  @@map("prospect_provenance")
 }
 
 model ProspectingJob {
