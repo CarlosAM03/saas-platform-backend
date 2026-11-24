@@ -118,15 +118,13 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
         service.confirm(campaignId, csv, first.previewReference, link),
         service.confirm(campaignId, csv, first.previewReference, link),
       ]);
-      expect(confirmations).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ status: 'fulfilled' }),
-          expect.objectContaining({
-            status: 'rejected',
-            reason: expect.objectContaining({ status: 409 }),
-          }),
-        ]),
+      expect(
+        confirmations.filter((result) => result.status === 'fulfilled'),
+      ).toHaveLength(1);
+      const rejected = confirmations.find(
+        (result) => result.status === 'rejected',
       );
+      expect(rejected?.reason as unknown).toMatchObject({ status: 409 });
       await expect(
         service.confirm(campaignId, csv, first.previewReference, link),
       ).rejects.toThrow('new preview');
