@@ -20,3 +20,19 @@ Fecha 2026-11-23 (America/Tijuana). Comandos completos y fixtures en [Reproducir
 Total de regresión principal del candidato: 462 pruebas en 34 suites. El aumento es de una prueba PostgreSQL de replay CSV. Las pruebas de performance usan ejecución separada. [Rendimiento](RENDIMIENTO.md), [QA por criterio](MATRIZ_QA.csv).
 
 El commit documental de publicación agrega exclusivamente el paquete de cierre y utilidades de reproducción dentro de `codex/cierre-pr11-backend/`. El SHA de código probado se consigna arriba y la comprobación de CI remoto del SHA de publicación queda en el recibo local.
+
+## Continuación CP-02 — 24 de noviembre de 2026
+
+SHA local `1aacee9928a0d526b4c76dfc26cf6a7ed6703c25`, exportación Git limpia, Node 20.20.2, Prisma 5.22.0 y PostgreSQL 16 sintético. El pipeline invocó los verificadores de destino y contrato, ESLint, Prettier, build, unitarias, HTTP, migraciones locales y la suite PG. Docker build y Swagger servido se comprobaron en un segundo laboratorio interno.
+
+| Paso | Observado |
+|---|---|
+| `npm run test:unit:ci` | 178/178 en 12 suites |
+| `npm run test:e2e:ci` | 84/84 en 7 suites |
+| `npm run test:postgres -- --verbose` | 206/206 en 15 suites. Incluye los 6 casos nuevos de CP-02 y las regresiones de Users y aislamiento. |
+| Repetición dirigida en la misma exportación, filtro CP-02 | 6/6 y exit 0. Estas ejecuciones repetidas no aumentan el total de regresión. |
+| Prisma migrate deploy | Cuatro migraciones en la base PG16 vacía del laboratorio. |
+| Guardas, verificador contractual, lint, formato, build y Docker build | PASS. El verificador de destino reportó cero conexiones externas. |
+| Swagger servido y matriz de André | PASS. Health ready, 39 rutas, 77 esquemas, 25 operaciones CP cotejadas y huella normalizada idéntica. |
+
+Total 468 pruebas de regresión aprobadas. El rendimiento y la restauración detallada conservan su atribución a la ejecución anterior. Los logs locales están en `.tmp/cp02-1124/`. [CP-02](CP02.md)

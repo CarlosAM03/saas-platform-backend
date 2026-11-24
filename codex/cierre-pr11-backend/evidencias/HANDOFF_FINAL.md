@@ -1,30 +1,23 @@
-# Handoff final del PR #11
+# Handoff final del PR #11 — CP-02
 
-**Recomendación: `BLOCKED` para merge por CP-02.** El candidato conserva la API entregada a André, corrige dos defectos reproducidos y tiene 462 pruebas de regresión local verificadas. Falta resolver y validar qué ocurre cuando se confirma una asignación durante la pérdida de elegibilidad.
+**CP-02 resuelto.** El owner fijó el requisito de elegibilidad hasta commit el 24 de noviembre de 2026. Los cuatro casos concurrentes fallaron de forma determinista en el baseline y los seis casos dirigidos pasaron en el candidato. El dictamen `READY_FOR_OWNER_REVIEW` aplica al confirmar los tres jobs del SHA publicado en el recibo local `RECIBO_CI_CP02.md`.
 
-- PR y rama de publicación: [CarlosAM03/saas-platform-backend #11](https://github.com/CarlosAM03/saas-platform-backend/pull/11), `feat/sprint-campana-prospector` → `dev`.
-- Head inicial: `a68cc4e62ab7510503c617f4c78d00d561c52681`. SHA de código probado: `706cdbf679ec4ac82d89eddfc89fd132fd7575e1`.
-- Confirmación del SHA final publicado y CI exacto: `RECIBO_CI_FINAL.md` local. El último commit de la rama contiene exclusivamente este paquete de auditoría y evidencia.
-
-## Cambios y resultados
-
-| Commit | Entrega |
+| Referencia | SHA / estado |
 |---|---|
-| `92b77d3` | El selector de responsables devuelve `eligible: true`, ya documentado. |
-| `aef737f` | El snapshot de preview detecta la reaparición CSV confirmada. |
-| `d3d52ee` | Conteo de apariciones evita depender de empates de timestamp. Caso concurrente dirigido. |
-| `706cdbf` | Aserción del 409 concurrente compatible con ESLint. |
+| HEAD remoto inicial de esta continuación | `81fa2652feec48ef853d0d3f61cf62ddd8d7f482` |
+| Código y tests validados | `1aacee9928a0d526b4c76dfc26cf6a7ed6703c25` |
+| Publicación | `feat/sprint-campana-prospector` → `dev`. SHA exacto y CI en el recibo local. |
 
-- **Pruebas locales:** 178 unitarias, 84 HTTP, 200 PostgreSQL 16. Node 20, guardas, Prisma Client, lint, formato y Docker build verificados. [Resultados y reproducción](RESULTADOS.md)
-- **Migraciones:** cuatro migraciones en esquema vacío, ADR-006 poblado con ambas fases CP, interrupción controlada y restauración sintética verificada. [Migración](MIGRACION.md)
-- **Contrato:** `/api/docs-json` del runtime coincide con la huella normalizada de `3b5eec6`. 39 rutas, 77 esquemas, 51 operaciones y 25/25 pares de André presentes. [Suplemento contractual](CONTRATO_Y_HANDOFF.md)
-- **Dependencias:** 25 moderadas de tooling, cero en producción. [Detalle](DEPENDENCIAS.md)
-- **Auditoría:** 36 commits originales, cuatro de código/QA nuevos y el paquete documental. [Matriz](MATRIZ_COMMITS.csv)
+## Validación
 
-## Decisión del owner
+- **Revocación antes de la asignación:** el backend espera y rechaza sin actualizar la participación ni insertar un evento.
+- **Asignación antes de la revocación:** la revocación espera el commit. La lectura posterior mantiene responsable e historial con `eligible: false`.
+- **Timeout y aislamiento:** el timeout revierte el cambio y el reintento genera un único evento. Retirar la membresía del mismo usuario en otro tenant no bloquea la asignación del tenant propio. No se observaron deadlocks en los órdenes ejercitados. [Pruebas CP-02](CP02.md)
+- **Regresión local:** 178 unitarias, 84 HTTP y 206 PostgreSQL 16, 468 en total. Guardas, verificador contractual, lint, formato, compilación y Docker build aprobados. [Resultados](RESULTADOS.md)
+- **Contrato de André:** el Swagger servido coincide con `3b5eec6` y conserva los 25 pares método/ruta entregados. [Paridad contractual](CONTRATO_Y_HANDOFF.md)
 
-CP-02. La prueba de pérdida de elegibilidad posterior a una asignación válida conserva el responsable histórico. La confirmación bajo revocación simultánea aún no tiene un criterio acordado. El owner puede aceptar la validación al leer elegibilidad y la marca posterior de reasignación, o exigir elegibilidad hasta confirmar. La segunda opción requiere validar bloqueos y orden de adquisición con Users antes de introducir un ajuste en CP. [Hallazgos y opciones](HALLAZGOS.md)
+El commit `1aacee9` contiene la corrección y seis casos PG16. El commit siguiente actualiza el paquete de evidencias. Se conservan la auditoría y los resultados históricos. [Matriz de commits](MATRIZ_COMMITS.csv)
 
-Integración propuesta para después del GO: sincronizar `dev` con `main` y después integrar el PR #11 a `dev`, ambas operaciones con merge normal y verificación de árbol y CI sobre la base vigente. El ensayo local produjo árboles equivalentes sin mover ramas compartidas. [Plan](PLAN_INTEGRACION.md)
+La integración posterior conserva el plan de sincronizar primero `dev` con `main` y luego integrar el [PR #11](https://github.com/CarlosAM03/saas-platform-backend/pull/11). [Ensayo de integración](PLAN_INTEGRACION.md)
 
-G6 permanece pendiente del owner. T32 permanece `NOT_RUN`, a cargo de André. La publicación es para revisión.
+G6 sigue pendiente del owner. T32 permanece `NOT_RUN`.

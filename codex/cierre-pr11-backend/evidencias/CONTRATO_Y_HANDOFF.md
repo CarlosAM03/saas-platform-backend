@@ -29,3 +29,9 @@ Resultado original en Windows: 26 diferencias de EOL. Procedimiento para reprodu
 3. Ejecutar `node <exportación>/codex/sprint-campanas-prospectos/herramientas/verificar-integridad.mjs`. Observado sobre `a68cc4e`: `Checked 27 files; anomalies: 0`.
 
 T32 sigue `NOT_RUN` y corresponde a André.
+
+## Revalidación CP-02 del 24 de noviembre
+
+`1aacee9928a0d526b4c76dfc26cf6a7ed6703c25` sirvió `/api/docs-json` desde el contenedor de runtime, con PostgreSQL 16 desechable y onboarding apagado. SHA256 normalizado `1520369724d778a620541c1f56e312dd6a41a221afdbb3e857030b6c6a7ec14f`, igual a `3b5eec6`. Se verificaron 39 rutas, 77 esquemas y los 25 pares método/ruta de la matriz de André. El diff de `Docs/Contracts/` es vacío.
+
+CP-02 conserva el campo `responsible.eligible` y el error de validación de asignación inelegible. La lectura posterior a una pérdida de elegibilidad sigue mostrando el responsable con `eligible: false` para su reasignación. [Pruebas dirigidas](CP02.md)
