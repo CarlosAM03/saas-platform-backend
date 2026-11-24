@@ -105,6 +105,36 @@ describe('CSV atomicity with disposable PostgreSQL', () => {
       2,
     );
   });
+  it('requires a fresh preview to record another appearance in an existing participation', async () => {
+    await run(async () => {
+      const csv = Buffer.from('name\nSynthetic returning prospect');
+      const create = '[{"record":1,"action":"CREATE"}]';
+      const link = '[{"record":1,"action":"LINK_EXISTING"}]';
+      const initial = await service.preview(campaignId, csv);
+      await service.confirm(campaignId, csv, initial.previewReference, create);
+
+      const first = await service.preview(campaignId, csv);
+      await service.confirm(campaignId, csv, first.previewReference, link);
+      await expect(
+        service.confirm(campaignId, csv, first.previewReference, link),
+      ).rejects.toThrow('new preview');
+      const appearances = () =>
+        prisma.prospectProvenance.count({
+          where: { tenantId, campaignId, type: 'REAPPEARED' },
+        });
+      expect(await appearances()).toBe(1);
+
+      const fresh = await service.preview(campaignId, csv);
+      await service.confirm(campaignId, csv, fresh.previewReference, link);
+      expect(await appearances()).toBe(2);
+      expect(
+        await prisma.campaignProspect.count({ where: { campaignId } }),
+      ).toBe(1);
+      expect(
+        await prisma.campaignActivity.count({ where: { campaignId } }),
+      ).toBe(1);
+    });
+  });
   it('AC-P3-02 rolls back a reverted batch without leaving durable provenance', async () => {
     await run(async () => {
       const preview = await service.preview(campaignId, file);

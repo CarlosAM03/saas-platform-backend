@@ -335,6 +335,12 @@ export class ProspectImportsService {
           ...candidateSelect.campaignProspects,
           where: { campaign: { tenantId } },
         },
+        provenanceEvents: {
+          where: { tenantId, campaignId, source: 'csv', type: 'REAPPEARED' },
+          orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: { id: true },
+        },
       },
       orderBy: { id: 'asc' },
     });
@@ -387,7 +393,20 @@ export class ProspectImportsService {
         })),
       };
     });
-    return { rows: classified, snapshot: hash(JSON.stringify(candidates)) };
+    // An existing link can record an appearance without changing the master or
+    // participation. Include that evidence so its preview cannot be reused.
+    const snapshotCandidates = candidates.map(
+      ({ provenanceEvents, ...candidate }) => {
+        const latestAppearance = provenanceEvents?.[0];
+        return latestAppearance
+          ? { ...candidate, lastCsvAppearanceId: latestAppearance.id }
+          : candidate;
+      },
+    );
+    return {
+      rows: classified,
+      snapshot: hash(JSON.stringify(snapshotCandidates)),
+    };
   }
 
   private summary(rows: { classification: string }[]) {
