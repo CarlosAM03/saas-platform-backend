@@ -1,12 +1,15 @@
 import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, RoleName } from '@prisma/client';
+import { normalizeEmail } from '../src/common/validation/normalize-email';
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
   const adminName = process.env.ADMIN_NAME;
-  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminEmail = process.env.ADMIN_EMAIL
+    ? normalizeEmail(process.env.ADMIN_EMAIL)
+    : undefined;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
   if (!adminName || !adminEmail || !adminPassword) {
@@ -22,7 +25,8 @@ async function main(): Promise<void> {
   if (existingAdmin) {
     if (
       existingAdmin.platformRole !== 'ADMIN' ||
-      existingAdmin.status !== 'ACTIVO'
+      existingAdmin.status !== 'ACTIVO' ||
+      existingAdmin.mustChangePassword
     ) {
       throw new Error(
         'Existing seed account is not an active global ADMIN; review the account explicitly.',

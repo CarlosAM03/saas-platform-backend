@@ -9,6 +9,7 @@ import { Response } from 'express';
 import { Request } from 'express';
 import { PinoLogger } from 'nestjs-pino';
 import { TenantContextService } from '../context/tenant-context.service';
+import { randomUUID } from 'node:crypto';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -21,6 +22,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
     const request = context.getRequest<Request & { requestId?: string }>();
+    // Also covers parser failures before module middleware and guards run.
+    const sensitiveFirstAccess =
+      /\/(?:auth\/(?:redeem|complete)-first-access|tenants\/(?:register|[^/?]+\/(?:onboarding|resend-welcome)))\/?$/.test(
+        request.path,
+      );
+    if (sensitiveFirstAccess) {
+      response.setHeader('Cache-Control', 'no-store');
+      if (!request.requestId) {
+        request.requestId = randomUUID();
+        response.setHeader('X-Request-Id', request.requestId);
+      }
+    }
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
@@ -41,9 +54,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           })
         : undefined;
     const message =
-      typeof exceptionResponse === 'string'
-        ? exceptionResponse
-        : (responseBody?.message ?? 'Internal server error');
+      sensitiveFirstAccess && status === 400
+        ? 'Invalid request'
+        : typeof exceptionResponse === 'string'
+          ? exceptionResponse
+          : (responseBody?.message ?? 'Internal server error');
     const codeByStatus: Record<number, string> = {
       400: 'VALIDATION_ERROR',
       401: 'UNAUTHORIZED',

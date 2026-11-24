@@ -29,6 +29,7 @@ type AuthenticatedUser = Pick<
   | 'name'
   | 'email'
   | 'passwordHash'
+  | 'mustChangePassword'
   | 'platformRole'
   | 'status'
   | 'createdAt'
@@ -54,7 +55,7 @@ export class AuthService {
   ): Promise<AuthenticatedUser> {
     const user = await this.userTenantService.findUserByEmail(email);
 
-    if (!user || user.status !== 'ACTIVO') {
+    if (!user || user.status !== 'ACTIVO' || user.mustChangePassword) {
       this.logger.warn({ email, outcome: 'failure' }, 'login failed');
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -72,6 +73,8 @@ export class AuthService {
   }
 
   async login(user: AuthenticatedUser): Promise<AuthContextResponse> {
+    if (user.mustChangePassword)
+      throw new UnauthorizedException('Invalid credentials');
     const activeTenants = user.userTenants.filter(
       ({ tenant }) => tenant.status === 'ACTIVO',
     );
@@ -169,7 +172,7 @@ export class AuthService {
 
   private async findUser(userId: string): Promise<AuthenticatedUser> {
     const user = await this.userTenantService.findUserById(userId);
-    if (!user || user.status !== 'ACTIVO') {
+    if (!user || user.status !== 'ACTIVO' || user.mustChangePassword) {
       throw new UnauthorizedException('User is inactive or does not exist');
     }
 

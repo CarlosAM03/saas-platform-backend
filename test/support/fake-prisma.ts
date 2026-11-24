@@ -65,6 +65,7 @@ export async function createFakePrisma() {
         name: 'Owner A',
         email: 'owner@example.com',
         passwordHash: ownerPassword,
+        mustChangePassword: false,
         platformRole: null,
         status: 'ACTIVO',
         createdAt: now,
@@ -75,6 +76,7 @@ export async function createFakePrisma() {
         name: 'Member A',
         email: 'member@example.com',
         passwordHash: memberPassword,
+        mustChangePassword: false,
         platformRole: null,
         status: 'ACTIVO',
         createdAt: now,
@@ -85,6 +87,7 @@ export async function createFakePrisma() {
         name: 'Multi Tenant',
         email: 'multi@example.com',
         passwordHash: memberPassword,
+        mustChangePassword: false,
         platformRole: null,
         status: 'ACTIVO',
         createdAt: now,
@@ -95,6 +98,7 @@ export async function createFakePrisma() {
         name: 'Inactive User',
         email: 'inactive@example.com',
         passwordHash: inactivePassword,
+        mustChangePassword: false,
         platformRole: null,
         status: 'INACTIVO',
         createdAt: now,
@@ -105,6 +109,7 @@ export async function createFakePrisma() {
         name: 'Platform Admin',
         email: 'admin@example.com',
         passwordHash: ownerPassword,
+        mustChangePassword: false,
         platformRole: 'ADMIN',
         status: 'ACTIVO',
         createdAt: now,
@@ -115,6 +120,7 @@ export async function createFakePrisma() {
         name: 'Owner B',
         email: 'owner-b@example.com',
         passwordHash: ownerPassword,
+        mustChangePassword: false,
         platformRole: null,
         status: 'ACTIVO',
         createdAt: now,
@@ -158,6 +164,7 @@ export async function createFakePrisma() {
   type Where = {
     id?: string;
     email?: string;
+    name?: string;
     tenantId?: string;
     status?: string;
     userTenants?: { some?: { tenantId?: string; userId?: string } };
@@ -270,6 +277,7 @@ export async function createFakePrisma() {
         const u: User = {
           id: 'user-' + (state.users.length + 1),
           ...data,
+          mustChangePassword: false,
           platformRole: null,
           status: 'ACTIVO',
           createdAt: now,
@@ -316,8 +324,10 @@ export async function createFakePrisma() {
         where,
       }: {
         where: {
-          userId: string;
+          userId?: string;
           tenantId?: string;
+          roleId?: string;
+          user?: { status: string };
           tenant?: { status: string };
         };
         include?: unknown;
@@ -326,7 +336,11 @@ export async function createFakePrisma() {
         state.userTenants
           .filter(
             (m) =>
-              m.userId === where.userId &&
+              (!where.userId || m.userId === where.userId) &&
+              (!where.roleId || m.roleId === where.roleId) &&
+              (!where.user?.status ||
+                state.users.find((u) => u.id === m.userId)?.status ===
+                  where.user.status) &&
               (!where.tenantId || m.tenantId === where.tenantId),
           )
           .map(hydrateMembership)
@@ -354,6 +368,7 @@ export async function createFakePrisma() {
         state.roles.find(
           (r) =>
             (!where.id || r.id === where.id) &&
+            (!where.name || r.name === where.name) &&
             (!where.tenantId || r.tenantId === where.tenantId),
         ) ?? null,
       findMany: ({ where }: { where: Where }) =>

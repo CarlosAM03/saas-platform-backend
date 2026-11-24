@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { normalizeEmail } from '../../common/validation/normalize-email';
 
 const userWithTenants = {
   userTenants: {
@@ -14,7 +15,7 @@ export class UserTenantService {
 
   findUserByEmail(email: string) {
     return this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
       include: userWithTenants,
     });
   }

@@ -25,7 +25,10 @@ async function main(): Promise<void> {
   const existingAdmin = await prisma.user.findUnique({
     where: { email: adminEmail },
   });
-  if (existingAdmin && existingAdmin.id !== 'demo-admin') {
+  if (
+    existingAdmin &&
+    (existingAdmin.id !== 'demo-admin' || existingAdmin.mustChangePassword)
+  ) {
     throw new Error('Demo ADMIN email belongs to another account.');
   }
   await prisma.user.upsert({
@@ -79,7 +82,10 @@ async function main(): Promise<void> {
       const id = `demo-user-${tenant.slug}-${person.role.toLowerCase()}`;
       const email = `${person.role.toLowerCase()}.${tenant.slug}@demo.example`;
       const existingUser = await prisma.user.findUnique({ where: { email } });
-      if (existingUser && existingUser.id !== id) {
+      if (
+        existingUser &&
+        (existingUser.id !== id || existingUser.mustChangePassword)
+      ) {
         throw new Error(`Demo email belongs to another account: ${email}`);
       }
       const user = await prisma.user.upsert({

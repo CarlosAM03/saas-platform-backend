@@ -1,3 +1,5 @@
+import { Transform } from 'class-transformer';
+import { transformEmail } from '../../common/validation/normalize-email';
 import {
   IsEmail,
   IsEnum,
@@ -17,6 +19,7 @@ export class UpdateUserRequest {
   name?: string;
 
   @ValidateIf((_object, value: unknown) => value !== undefined)
+  @Transform(transformEmail)
   @IsEmail()
   email?: string;
 

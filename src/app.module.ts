@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TenantRegistrationModule } from './tenant-registration/tenant-registration.module';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,6 +16,7 @@ import { ProspectImportsModule } from './prospects/imports/prospect-imports.modu
 
 @Module({
   imports: [
+    TenantRegistrationModule,
     ConfigModule,
     CommonModule,
     PrismaModule,

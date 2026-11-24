@@ -1,5 +1,7 @@
 # Core v1.0.0 — Avance 2
 
+> Actualización G1 ADR-006, decisión owner D4 (28/10/2026): el riesgo histórico de JWT snapshot descrito abajo queda acotado para POST/PATCH/DELETE Users y altas/reenvíos de onboarding. Estas escrituras revalidan autoridad actual en PostgreSQL dentro de la transacción; el resto del modelo JWT de ocho horas permanece vigente. Se preserva el registro Core original y su evidencia. Véase [handoff G1](../../codex/backend-adr006/evidencias/10_HANDOFF_GATE1.md).
+
 Base autorizada: `3a3309398458ab333d7b00f16e9c2df6a09ef734`. SEC-01 protege identidad global compartida y ADMIN ajeno dentro de transacción Serializable; conserva self-edit y asignación de rol del tenant. Se seleccionaron validación de configuración productiva, CORS trim, 413 y overrides de seguridad de forma acotada.
 
 Prisma/schema, migración init, JwtStrategy, Jobs, cliente Prospector y contrato público baseline permanecen sin cambios. Sin P2, cuotas, snapshots de generación ni callbacks operativos. Las rutas de generación conservadas responden 503 tras validar; Idempotency-Key sigue obligatorio al crear.
