@@ -56,16 +56,18 @@ La equivalencia entre este artefacto y el documento realmente servido está adem
 
 ## 4. Integridad del arnés del sprint
 
+Estado inicial del bloque (antes de la decisión del owner):
+
 ```text
 node codex/sprint-campanas-prospectos/herramientas/verificar-integridad.mjs
 Checked 27 files; anomalies: 1.
 CHANGED 06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv
 ```
 
-- **Causa:** el archivo estaba en el manifiesto como plantilla vacía y G5 exige rellenarlo con las rutas reales (`01_PLANTILLA_HARNESS_FRONTEND.md` lo indica expresamente). No es una alteración oculta: el contenido nuevo está descrito en este documento y es el entregable del gate.
-- **No se actualizó `MANIFEST_INTEGRIDAD.json`** para no renovar la línea base de integridad por cuenta propia.
-- **Opciones para el owner:** (A) autorizar la actualización del manifiesto con el nuevo hash; (B) dejar la matriz fuera del manifiesto en una próxima revisión del arnés; (C) mantener la anomalía declarada como cambio autorizado de G5.
-- **Impacto:** sólo afecta la detección de cambios de la plantilla; ningún otro archivo del arnés cambió (26 `OK`).
+- **Causa:** el archivo estaba en el manifiesto como plantilla vacía y G5 exige rellenarlo con las rutas reales (`01_PLANTILLA_HARNESS_FRONTEND.md` lo indica expresamente). No era una alteración oculta: el contenido nuevo es el entregable del gate.
+- **Decisión del owner (2026-11-23):** opción **A — refrescar el manifiesto**. Instrucción: «A: refrescar el manifiesto». Registrada en `decisiones/SOLICITUDES_OWNER.md` (`G5-O1`).
+- **Acción aplicada:** se actualizó únicamente el hash de `06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv` en `MANIFEST_INTEGRIDAD.json` (de `6249e58…` a `b356324…`) y se añadió el bloque `lastAuthorizedRefresh` con fecha, archivo, autorizador, motivo y evidencia. Ningún otro hash se tocó.
+- **Resultado posterior:** `Checked 27 files; anomalies: 0.` (exit 0).
 
 ## 5. Límites y riesgos abiertos
 

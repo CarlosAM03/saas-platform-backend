@@ -14,6 +14,13 @@
     "not_execution_base": true
   },
   "note": "Integrity hashes only. Owner authorization and test execution must be independently evidenced.",
+  "lastAuthorizedRefresh": {
+    "date": "2026-11-23",
+    "file": "06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv",
+    "authorizedBy": "owner",
+    "reason": "G5 relleno la matriz contractual; el hash previo correspondia a la plantilla vacia.",
+    "evidence": "05_EVIDENCIAS/G5/ARNES_ANDRE_3B5EEC6.md"
+  },
   "sha256": {
     "00_PROMPT_ACTIVACION.txt": "bb8472da0a97ec44f8a55638110150b178959878722cfb1cda939c73b9db4a07",
     "01_GOBIERNO/01_AUTORIDAD_PRECEDENCIA.md": "56be9cd9a6bf3300682d055fcdaa537676effcf7bd5815010db35d1b5edcfd68",
@@ -38,7 +45,7 @@
     "04_REFERENCIAS/contexto_base_campanas_y_arneses_v0.md": "170a553de303d055e68d40d1623082e3967a38a42b85ef8e6c5e3817eb6844a2",
     "06_HANDOFF_ANDRE/00_CONTRATO_DE_ENTREGA.md": "5bec3ef9ee5286db7fd562bf75a9c82d0b8e6382d7d7ba8293aef23b31e0bc3c",
     "06_HANDOFF_ANDRE/01_PLANTILLA_HARNESS_FRONTEND.md": "208e6605b67e17046f89b1e5438c2546a8511c4529afc2922f36481a9ff8a66e",
-    "06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv": "6249e586f1b49f8767ab7ef03c5c7045aea8fd0838da7bedaec1259d59f9fff1",
+    "06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv": "b356324466af9542da915b4122549b2cbb0814c527c1779b8ef5184c8f2fb065",
     "README.md": "c10adb2caf78fba198bad78ca3440f6a111126dfca4107a4436130f4c90b1ddb",
     "herramientas/preflight.mjs": "7626d93b4525d711423fe4c3c58f39c40456b56bea819022de83394fd8cd7a15",
     "herramientas/verificar-integridad.mjs": "bb4240f57fff2ebc5ee027c4cb4d3c35ab5ae83a71e350234c6d2ca4e36372c7"
