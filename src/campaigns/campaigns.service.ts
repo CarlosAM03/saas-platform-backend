@@ -429,7 +429,9 @@ export class CampaignsService {
       },
       orderBy: [{ user: { name: 'asc' } }, { userId: 'asc' }],
     });
-    return { data: memberships.map((membership) => membership.user) };
+    return {
+      data: memberships.map(({ user }) => ({ ...user, eligible: true })),
+    };
   }
 
   async assignResponsible(

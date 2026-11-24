@@ -788,6 +788,11 @@ describe('T31 CP HTTP isolation with homonymous tenants on PostgreSQL', () => {
       .get(`${base(campaigns[0], prospects[0])}/responsibles`)
       .set('Authorization', `Bearer ${ownerA}`)
       .expect(200);
+    expect(body<{ id: string; eligible: boolean }[]>(eligible).data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: users[2], eligible: true }),
+      ]),
+    );
     expect(JSON.stringify(eligible.body)).not.toContain(users[1]);
 
     const filtered = await http()
