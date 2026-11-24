@@ -1,4 +1,10 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { CreateProspectRequest } from './create-prospect.request';
 
 export class ResolveProspectRequest extends CreateProspectRequest {

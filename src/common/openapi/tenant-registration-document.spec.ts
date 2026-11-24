@@ -18,7 +18,7 @@ const operations = (doc: OpenAPIObject) =>
   );
 
 describe('ADR006 controlled contract composition', () => {
-it('preserves all 45 core operations and login shape; adds exactly five unique operations', () => {
+  it('preserves all 45 core operations and login shape; adds exactly five unique operations', () => {
     const core = baseline();
     const before = structuredClone(core);
     addTenantRegistration(core, true);

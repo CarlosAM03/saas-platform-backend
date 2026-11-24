@@ -126,7 +126,9 @@ describe('G1 BR03 authoritative user administration and QF01 (PostgreSQL)', () =
     adminB = sign(adminId, b, 'ADMIN', null);
   });
   afterEach(async () => {
-    await db.campaignActivity.deleteMany({ where: { tenantId: { in: [a, b] } } });
+    await db.campaignActivity.deleteMany({
+      where: { tenantId: { in: [a, b] } },
+    });
     await db.campaignProspect.deleteMany({
       where: { campaign: { tenantId: { in: [a, b] } } },
     });

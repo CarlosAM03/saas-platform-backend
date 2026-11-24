@@ -125,11 +125,7 @@ export class CampaignsController {
     @Param('campaignId') campaignId: string,
     @Param('prospectId') prospectId: string,
   ) {
-    return this.campaigns.assignResponsible(
-      campaignId,
-      prospectId,
-      null,
-    );
+    return this.campaigns.assignResponsible(campaignId, prospectId, null);
   }
 
   @Get(':campaignId/prospects/:prospectId/activities')
@@ -147,10 +143,6 @@ export class CampaignsController {
     @Param('prospectId') prospectId: string,
     @Body() request: CreateCampaignActivityRequest,
   ) {
-    return this.campaigns.createActivity(
-      campaignId,
-      prospectId,
-      request,
-    );
+    return this.campaigns.createActivity(campaignId, prospectId, request);
   }
 }
