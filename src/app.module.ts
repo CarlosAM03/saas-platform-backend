@@ -13,6 +13,7 @@ import { ProspectsModule } from './prospects/prospects.module';
 import { ProspectingJobsModule } from './prospecting-jobs/prospecting-jobs.module';
 import { ProspectorClientModule } from './prospector-client/prospector-client.module';
 import { ProspectImportsModule } from './prospects/imports/prospect-imports.module';
+import { BatchModule } from './prospector-batch/batch.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProspectImportsModule } from './prospects/imports/prospect-imports.modu
     ProspectImportsModule,
     ProspectingJobsModule,
     ProspectorClientModule,
+    BatchModule,
   ],
   controllers: [AppController],
   providers: [AppService],
