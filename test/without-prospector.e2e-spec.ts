@@ -167,6 +167,77 @@ describe('Platform without Prospector configuration or network', () => {
     expect(
       document.paths['/api/v1/campaigns'].post!.responses['201'],
     ).toBeDefined();
+    for (const [path, method] of [
+      ['/api/v1/campaigns/{id}/dashboard', 'get'],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/participation',
+        'get',
+      ],
+      ['/api/v1/campaigns/{campaignId}/prospects/{prospectId}/stage', 'patch'],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/evaluation',
+        'patch',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/responsibles',
+        'get',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/responsible',
+        'put',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/responsible',
+        'delete',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/activities',
+        'get',
+      ],
+      [
+        '/api/v1/campaigns/{campaignId}/prospects/{prospectId}/activities',
+        'post',
+      ],
+      ['/api/v1/prospects/match', 'post'],
+      ['/api/v1/prospects/resolve', 'post'],
+      ['/api/v1/prospects/{id}/campaigns', 'get'],
+      ['/api/v1/prospects/{id}/provenance', 'get'],
+    ] as const) {
+      const operation = document.paths[path][method];
+      expect(operation).toBeDefined();
+      expect(operation!['x-contract-status']).toBe('AVAILABLE');
+    }
+    // Served-document parity for the activity type contract (G4-O4/G4-O5).
+    const schemas = document.components!.schemas!;
+    const activityType = schemas.CampaignActivityType as {
+      enum?: string[];
+      description?: string;
+    };
+    expect(activityType.enum).toContain('CORRECTION');
+    expect(activityType.enum).toContain('MASTER_UPDATE');
+    expect(activityType.description).toContain('no lo genera');
+    const createActivity = schemas.CreateCampaignActivityRequest as {
+      properties: Record<string, { enum?: string[] }>;
+    };
+    expect(createActivity.properties.type.enum).toEqual([
+      'NOTE',
+      'CALL',
+      'EMAIL',
+      'MEETING',
+      'OTHER',
+    ]);
+    for (const rejected of [
+      'ASSOCIATION',
+      'STAGE_CHANGE',
+      'EVALUATION_CHANGE',
+      'RESPONSIBLE_CHANGE',
+      'CORRECTION',
+      'MASTER_UPDATE',
+    ])
+      expect(createActivity.properties.type.enum).not.toContain(rejected);
+    const dashboard = document.paths['/api/v1/campaigns/{id}/dashboard'].get!;
+    expect(dashboard.description).toContain('CORRECTION');
+    expect(dashboard.description).toContain('activity.manual');
     const visit = (value: unknown): void => {
       if (!value || typeof value !== 'object') return;
       for (const [key, child] of Object.entries(value)) {

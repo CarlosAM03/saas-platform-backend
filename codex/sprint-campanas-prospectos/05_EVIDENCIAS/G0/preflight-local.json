@@ -1,0 +1,23 @@
+{
+  "scope": "LOCAL_READ_ONLY_PREFLIGHT",
+  "timestamp": "2026-11-22T22:15:10.721Z",
+  "location": "repo root relative to harness",
+  "remoteSanitized": "github.com/CarlosAM03/saas-platform-backend",
+  "expectedRemote": "github.com/CarlosAM03/saas-platform-backend",
+  "remoteMatchesExpected": true,
+  "branch": "feat/sprint-campana-prospector",
+  "head": "d262f48e9ab6b344c472df60588c2261d377c884",
+  "topLevelIsExpected": true,
+  "changesCountIncludingHarness": 16,
+  "changesOutsideHarness": 16,
+  "cleanOutsideHarness": false,
+  "missingRequiredPaths": [],
+  "ownerAuthorizationDocumentExists": true,
+  "ownerAuthorizationStillTemplate": false,
+  "gate0": "REQUIERE_VERIFICACION_Y_GO_EXPLICITO_DEL_OWNER",
+  "notes": [
+    "This tool never grants G0.",
+    "Historical feat/tenant-register refs are not permission to start.",
+    "No credential values or modified file names are exported."
+  ]
+}

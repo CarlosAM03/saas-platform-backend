@@ -1,0 +1,53 @@
+{
+  "package": "HARNESS-CP-2026-01",
+  "version": "1.0",
+  "buildDateUTC": "2026-11-20",
+  "installPath": "<saas-platform-backend>/codex/sprint-campanas-prospectos/",
+  "goStatus": "G0_PENDIENTE_OWNER",
+  "sourceSpec": "04_REFERENCIAS/SPEC_SPRINT_CAMPANAS_PROSPECTOS_v1.0_OWNER_APROBADO.md",
+  "sourceSpecSha256": "7463012cfd71b17caf375cc4f6e6c9fbbdbd9125f8497595861cf634e655afef",
+  "baselineEvidence": {
+    "backendPR": "https://github.com/CarlosAM03/saas-platform-backend/pull/10",
+    "backendObservedSha": "5e214420394101ae7079f8e844cc759b01cce2a3",
+    "frontendPR": "https://github.com/CarlosAM03/saas-platform-client/pull/11",
+    "frontendObservedSha": "0fe5d368e11b1da745ccf42ead3892470dcae0be",
+    "not_execution_base": true
+  },
+  "note": "Integrity hashes only. Owner authorization and test execution must be independently evidenced.",
+  "lastAuthorizedRefresh": {
+    "date": "2026-11-23",
+    "file": "06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv",
+    "authorizedBy": "owner",
+    "reason": "G5 relleno la matriz contractual; el hash previo correspondia a la plantilla vacia.",
+    "evidence": "05_EVIDENCIAS/G5/ARNES_ANDRE_3B5EEC6.md"
+  },
+  "sha256": {
+    "00_PROMPT_ACTIVACION.txt": "bb8472da0a97ec44f8a55638110150b178959878722cfb1cda939c73b9db4a07",
+    "01_GOBIERNO/01_AUTORIDAD_PRECEDENCIA.md": "56be9cd9a6bf3300682d055fcdaa537676effcf7bd5815010db35d1b5edcfd68",
+    "01_GOBIERNO/02_ALCANCE_Y_LIMITES.md": "236c746635bb04b1ea18936967d1ab8997a84380ea44488b7d1b342da907f76b",
+    "01_GOBIERNO/03_RAMAS_G0.md": "015546f1919c28ef0f26b025f369b39645099d9657942ba4d42872c0fe6dcfde",
+    "01_GOBIERNO/04_REGISTRO_ESCALAMIENTO.md": "a18ad9a222f2d62ab43932444e6b15616c844ff5923410c95506450783cddc8d",
+    "02_EJECUCION/00_PLAN_FASES.md": "2761192c1530e86772953d46b6ae00bbb77b7b2abbcc320465181b0c6531dd7c",
+    "02_EJECUCION/01_G1_REAUDITORIA.md": "1d6d957325e443d573803db897d2fe572a4612d58cffb90ae5f479714781f3a4",
+    "02_EJECUCION/02_G2_DISENO.md": "6e67660d7bf5622641f0cfc3e2cc47ae080f933bb918e4f63060e56fcf2958d4",
+    "02_EJECUCION/03_G3_IMPLEMENTACION.md": "b552ab49dc6ae84b4d56595f5cd8d412c699b0194afad2f4930a81f3fb577b3d",
+    "02_EJECUCION/04_G4_QA.md": "2c73e4333e4cd74a4ca8fe62f4d2e9f5fa8ecb17dd7b17824fe79c48732f4dbd",
+    "02_EJECUCION/05_G5_G6_ENTREGA.md": "f8ed664f1e858ee353eaeec925da5e2845635fc7a0b8908f803f77593cbcadfa",
+    "02_EJECUCION/06_SUBAGENTES.md": "fe83dd19d5258a80be278eb70c9ee26831b53e9e92d92337070d15421a93513c",
+    "03_CALIDAD/ESCENARIOS_LIMITE.md": "6c6f17144be7a1cd49f1d33bff6712b5890e05bbae8b7216a8d9739ad0e7a2cd",
+    "03_CALIDAD/GATES_Y_DOD.md": "1139525ec46dbedac0ca599eedc9ad954088f7c17fdcd54ded4531167ff200b8",
+    "03_CALIDAD/MATRIZ_AC_Y_TESTS.md": "66addebf6047c31a1b1e7db23e91f926c81028ae83ca162376bad4e6bc00ac82",
+    "03_CALIDAD/PLANTILLA_RESULTADOS_T01_T32.csv": "8b83b8cda3095fdf87bf4f62a1a5953213406991fb72fbc0a01d53d1f0e43f89",
+    "04_REFERENCIAS/INDICE_DE_FUENTES.md": "bd6b050b32b61cbfebc4058e6b2d2c3dac9944fe8613e96401f56002a8392dba",
+    "04_REFERENCIAS/SPEC_SPRINT_CAMPANAS_PROSPECTOS_v1.0_OWNER_APROBADO.md": "7463012cfd71b17caf375cc4f6e6c9fbbdbd9125f8497595861cf634e655afef",
+    "04_REFERENCIAS/alcance_sprint_campanas_prospectos_v1_revision.md": "24bc91e8733bbdfb130541311426c4523bdd876033ca7331f5627151676c579f",
+    "04_REFERENCIAS/auditoria_pre_spec_sprint_campanas_prospectos_2026-11-19.md": "c42bd0fa6de18bf10af3106ae0504c9a5ec0f0713bc185c883a62d50633ee424",
+    "04_REFERENCIAS/contexto_base_campanas_y_arneses_v0.md": "170a553de303d055e68d40d1623082e3967a38a42b85ef8e6c5e3817eb6844a2",
+    "06_HANDOFF_ANDRE/00_CONTRATO_DE_ENTREGA.md": "5bec3ef9ee5286db7fd562bf75a9c82d0b8e6382d7d7ba8293aef23b31e0bc3c",
+    "06_HANDOFF_ANDRE/01_PLANTILLA_HARNESS_FRONTEND.md": "208e6605b67e17046f89b1e5438c2546a8511c4529afc2922f36481a9ff8a66e",
+    "06_HANDOFF_ANDRE/02_MATRIZ_API_FLUTTER.csv": "b356324466af9542da915b4122549b2cbb0814c527c1779b8ef5184c8f2fb065",
+    "README.md": "c10adb2caf78fba198bad78ca3440f6a111126dfca4107a4436130f4c90b1ddb",
+    "herramientas/preflight.mjs": "7626d93b4525d711423fe4c3c58f39c40456b56bea819022de83394fd8cd7a15",
+    "herramientas/verificar-integridad.mjs": "bb4240f57fff2ebc5ee027c4cb4d3c35ab5ae83a71e350234c6d2ca4e36372c7"
+  }
+}
