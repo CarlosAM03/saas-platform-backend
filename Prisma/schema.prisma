@@ -305,6 +305,105 @@ model ProspectingJob {
 }
 
 
+enum BatchAdmissionStatus {
+  PENDING
+  ACCEPTED
+  UNCERTAIN
+  REJECTED
+}
+
+enum BatchJobState {
+  QUEUED
+  RUNNING
+  AWAITING_RESULTS
+  COMPLETED
+  FAILED
+  INTERRUPTED
+  SKIPPED
+}
+
+enum BatchResultQuality {
+  SUCCESS
+  SUCCESS_WITH_ISSUES
+  PARTIAL
+}
+
+enum BatchResultAvailability {
+  AVAILABLE
+  EXPIRED
+  PURGED
+  UNAVAILABLE
+}
+
+model ProspectingBatch {
+  id               String                @id @default(cuid())
+  solutionId       String                @map("solution_id")
+  tenantId         String                @map("tenant_id")
+  ownerId          String                @map("owner_id")
+  campaignId       String                @map("campaign_id")
+  requestKeyHash   String                @map("request_key_hash")
+  requestHash      String                @map("request_hash")
+  admission        BatchAdmissionStatus  @default(PENDING)
+  rejectionStatus  Int?                  @map("rejection_status")
+  acceptedAt       DateTime?             @map("accepted_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  jobs             ProspectingBatchJob[]
+
+  @@unique([solutionId, tenantId, ownerId, requestKeyHash], name: "batchRequest")
+  @@index([tenantId, ownerId, createdAt])
+  @@map("prospecting_batches")
+}
+
+model ProspectingBatchJob {
+  id           String                   @id @default(cuid())
+  batchId      String                   @map("batch_id")
+  position     Int
+  state        BatchJobState?
+  sequence     Int                      @default(0)
+  quality      BatchResultQuality?
+  availability BatchResultAvailability?
+  progress     Json?
+  snapshotId   String?                  @map("snapshot_id")
+  expiresAt    DateTime?                @map("expires_at")
+  ackAt        DateTime?                @map("ack_at")
+  errorCode    String?                  @map("error_code")
+  observedAt   DateTime?                @map("observed_at")
+  batch        ProspectingBatch         @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  receipts     ProspectingBatchEvent[]
+  confirmations ProspectingBatchConfirmation[]
+
+  @@unique([batchId, position])
+  @@map("prospecting_batch_jobs")
+}
+
+model ProspectingBatchEvent {
+  id         String               @id
+  jobId      String               @map("job_id")
+  sequence   Int
+  digest     String
+  receivedAt DateTime             @default(now()) @map("received_at")
+  job        ProspectingBatchJob   @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@index([jobId, sequence])
+  @@map("prospecting_batch_events")
+}
+
+model ProspectingBatchConfirmation {
+  id             String               @id @default(cuid())
+  jobId          String               @map("job_id")
+  snapshotId     String               @map("snapshot_id")
+  decisionHash   String               @map("decision_hash")
+  processedCount Int                  @map("processed_count")
+  omittedCount   Int                  @map("omitted_count")
+  committedAt    DateTime             @default(now()) @map("committed_at")
+  ackAt          DateTime?            @map("ack_at")
+  purgedAt       DateTime?            @map("purged_at")
+  job            ProspectingBatchJob  @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@unique([jobId, snapshotId])
+  @@map("prospecting_batch_confirmations")
+}
+
 enum OnboardingStatus {
   PENDING_FIRST_ACCESS
   COMPLETED

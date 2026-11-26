@@ -103,5 +103,24 @@ export function deploymentDocument(): OpenAPIObject {
     document,
     process.env.TENANT_REGISTRATION_ENABLED === 'true',
   );
+  if (process.env.PROSPECTOR_BATCH_ENABLED === 'true') {
+    const batch = load(
+      readFileSync(
+        './Docs/Contracts/platform-api.prospecting-batch.v1.yaml',
+        'utf8',
+      ),
+    ) as OpenAPIObject;
+    Object.assign(document.paths, batch.paths);
+    Object.assign(
+      document.components?.schemas ?? {},
+      batch.components?.schemas,
+    );
+    Object.assign(
+      document.components?.parameters ?? {},
+      batch.components?.parameters,
+    );
+    document.info.description +=
+      ' Integración batch de prospección habilitada para sus dueños autorizados.';
+  }
   return document;
 }

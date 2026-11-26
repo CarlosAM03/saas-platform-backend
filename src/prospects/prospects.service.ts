@@ -90,6 +90,7 @@ export class ProspectsService {
     request: CreateProspectRequest,
     tenantId: string,
     client: Pick<Prisma.TransactionClient, 'campaign' | 'prospect'>,
+    external = false,
   ) {
     const campaign = await client.campaign.findFirst({
       where: { id: request.campaignId, tenantId },
@@ -139,7 +140,11 @@ export class ProspectsService {
     const strongProspect = strongMatches[0] ?? null;
     const normalized = this.normalizeName(request.name);
     const candidates = prospects
-      .filter((prospect) => this.normalizeName(prospect.name) === normalized)
+      .filter(
+        (prospect) =>
+          this.normalizeName(prospect.name) === normalized ||
+          (external && this.matchesContact(request, prospect)),
+      )
       .map((prospect) => this.toResponse(prospect));
     return {
       strongProspect: strongProspect ? this.toResponse(strongProspect) : null,
@@ -324,6 +329,114 @@ export class ProspectsService {
     return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es');
   }
 
+  async matchExternal(request: CreateProspectRequest) {
+    return this.matchUsing(
+      request,
+      this.tenantContext.requireTenantId(),
+      this.prisma,
+      true,
+    );
+  }
+
+  async confirmExternal(
+    request: CreateProspectRequest,
+    choice: {
+      action: 'CREATE' | 'LINK_EXISTING' | 'UPDATE_EXISTING';
+      candidateId?: string;
+    },
+    acquisition: {
+      tx: Prisma.TransactionClient;
+      batchId: string;
+      jobId: string;
+    },
+  ): Promise<void> {
+    const tenantId = this.tenantContext.requireTenantId();
+    const actorUserId = this.tenantContext.getRequiredContext().userId;
+    const external = {
+      ...acquisition,
+      ...(request.identityIdentifier
+        ? { identifier: request.identityIdentifier }
+        : {}),
+    };
+    if (choice.action === 'CREATE') {
+      await this.createNew(
+        tenantId,
+        actorUserId,
+        request.campaignId,
+        request,
+        this.identity(request),
+        true,
+        external,
+      );
+      return;
+    }
+    if (!choice.candidateId)
+      throw new BadRequestException('Candidate is required');
+    await this.linkExisting(
+      tenantId,
+      actorUserId,
+      request.campaignId,
+      choice.candidateId,
+      request,
+      false,
+      external,
+    );
+    if (choice.action === 'UPDATE_EXISTING') {
+      await this.update(
+        choice.candidateId,
+        {
+          contextCampaignId: request.campaignId,
+          name: request.name,
+          category: request.category ?? undefined,
+          address: request.address ?? undefined,
+          phone: request.phone ?? undefined,
+          email: request.email ?? undefined,
+          website: request.website ?? undefined,
+          language: request.language ?? undefined,
+        },
+        external,
+      );
+    }
+  }
+
+  private matchesContact(
+    request: CreateProspectRequest,
+    existing: {
+      phone: string | null;
+      address: string | null;
+      website: string | null;
+    },
+  ): boolean {
+    const phone = (value: string) => value.replace(/\D/gu, '');
+    const same = (
+      incoming: string | null | undefined,
+      stored: string | null,
+      normalizer: (value: string) => string,
+    ) => {
+      if (!incoming || !stored) return false;
+      const key = normalizer(incoming);
+      return key !== '' && key === normalizer(stored);
+    };
+    return (
+      same(request.phone, existing.phone, phone) ||
+      same(request.address, existing.address, (value) =>
+        this.normalizeName(value),
+      ) ||
+      same(request.website, existing.website, (value) => value.trim())
+    );
+  }
+
+  private prospectTransaction<T>(
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+    external?: { tx: Prisma.TransactionClient },
+  ): Promise<T> {
+    return external
+      ? operation(external.tx)
+      : this.prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+  }
+
   private async linkExisting(
     tenantId: string,
     actorUserId: string,
@@ -331,71 +444,79 @@ export class ProspectsService {
     prospectId: string,
     request: CreateProspectRequest,
     requireStrong = false,
+    external?: {
+      tx: Prisma.TransactionClient;
+      batchId: string;
+      jobId: string;
+      identifier?: string;
+    },
   ): Promise<ProspectResponse> {
     try {
-      return await this.prisma.$transaction(
-        async (tx) => {
-          const match = await this.matchUsing(request, tenantId, tx);
-          const eligible =
-            match.strongProspect?.id === prospectId ||
-            (!requireStrong &&
-              match.candidates.some(
-                (candidate) => candidate.id === prospectId,
-              ));
-          if (!eligible) {
-            throw new ConflictException(
-              'Candidate changed; request prospect matches again',
-            );
-          }
-          const prospect = await tx.prospect.findFirst({
-            where: { id: prospectId, tenantId },
-            select: prospectSelect,
-          });
-          if (!prospect) throw new NotFoundException('Prospect not found');
-          const campaign = await tx.campaign.findFirst({
-            where: { id: campaignId, tenantId },
-            select: { id: true },
-          });
-          if (!campaign) throw new NotFoundException('Campaign not found');
-          const existing =
-            typeof tx.campaignProspect.findFirst === 'function'
-              ? await tx.campaignProspect.findFirst({
-                  where: { campaignId, prospectId },
-                  select: { campaignId: true },
-                })
-              : null;
-          await tx.campaignProspect.upsert({
-            where: {
-              campaignId_prospectId: { campaignId, prospectId },
-            },
-            create: { campaignId, prospectId },
-            update: {},
-          });
-          await tx.prospectProvenance.create({
+      return await this.prospectTransaction(async (tx) => {
+        const match = await this.matchUsing(
+          request,
+          tenantId,
+          tx,
+          Boolean(external),
+        );
+        const eligible =
+          match.strongProspect?.id === prospectId ||
+          (!requireStrong &&
+            (!external || !match.strongProspect) &&
+            match.candidates.some((candidate) => candidate.id === prospectId));
+        if (!eligible) {
+          throw new ConflictException(
+            'Candidate changed; request prospect matches again',
+          );
+        }
+        const prospect = await tx.prospect.findFirst({
+          where: { id: prospectId, tenantId },
+          select: prospectSelect,
+        });
+        if (!prospect) throw new NotFoundException('Prospect not found');
+        const campaign = await tx.campaign.findFirst({
+          where: { id: campaignId, tenantId },
+          select: { id: true },
+        });
+        if (!campaign) throw new NotFoundException('Campaign not found');
+        const existing =
+          typeof tx.campaignProspect.findFirst === 'function'
+            ? await tx.campaignProspect.findFirst({
+                where: { campaignId, prospectId },
+                select: { campaignId: true },
+              })
+            : null;
+        await tx.campaignProspect.upsert({
+          where: {
+            campaignId_prospectId: { campaignId, prospectId },
+          },
+          create: { campaignId, prospectId },
+          update: {},
+        });
+        await tx.prospectProvenance.create({
+          data: {
+            tenantId,
+            prospectId,
+            campaignId,
+            type: existing ? 'REAPPEARED' : 'LINKED',
+            source: external ? 'google_maps' : 'manual',
+            actorUserId,
+            ...(external ? { details: this.acquisitionDetails(external) } : {}),
+          },
+        });
+        if (!existing) {
+          await tx.campaignActivity.create({
             data: {
               tenantId,
-              prospectId,
               campaignId,
-              type: existing ? 'REAPPEARED' : 'LINKED',
-              source: 'manual',
+              prospectId,
+              type: 'ASSOCIATION',
               actorUserId,
             },
           });
-          if (!existing) {
-            await tx.campaignActivity.create({
-              data: {
-                tenantId,
-                campaignId,
-                prospectId,
-                type: 'ASSOCIATION',
-                actorUserId,
-              },
-            });
-          }
-          return this.toResponse(prospect);
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
+        }
+        return this.toResponse(prospect);
+      }, external);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -420,58 +541,70 @@ export class ProspectsService {
       hash: string;
     } | null,
     consciousCreate = false,
+    external?: {
+      tx: Prisma.TransactionClient;
+      batchId: string;
+      jobId: string;
+      identifier?: string;
+    },
   ): Promise<ProspectResponse> {
     const metadata = this.prepareMetadata(request.metadata);
     try {
-      return await this.prisma.$transaction(
-        async (tx) => {
-          const campaign = await tx.campaign.findFirst({
-            where: { id: campaignId, tenantId },
-            select: { id: true },
-          });
-          if (!campaign) throw new NotFoundException('Campaign not found');
-          const match = await this.matchUsing(request, tenantId, tx);
-          if (match.strongProspect) {
-            throw this.matchConflict(
-              [match.strongProspect, ...match.candidates],
-              'Prospect identity already exists; request matches again',
-            );
-          }
-          if (!consciousCreate && match.candidates.length > 0) {
-            throw this.matchConflict(match.candidates);
-          }
-          const prospect = await tx.prospect.create({
-            data: {
-              tenantId,
-              campaignId,
-              name: request.name,
-              category: request.category,
-              address: request.address,
-              phone: request.phone,
-              email: request.email,
-              website: request.website,
-              language: request.language,
-              status: request.status,
-              metadata,
-              source: identity ? 'google_maps' : 'manual',
-              sourceIdentifier: identity?.identifier ?? null,
-              identitySource: identity?.source ?? null,
-              identityHash: identity?.hash ?? null,
-            },
-            select: prospectSelect,
-          });
-          await tx.campaignProspect.create({
-            data: { campaignId, prospectId: prospect.id },
-          });
-          await tx.prospectProvenance.create({
-            data: {
-              tenantId,
-              prospectId: prospect.id,
-              campaignId,
-              type: 'CREATED',
-              source: identity ? 'google_maps' : 'manual',
-              actorUserId,
-              ...(consciousCreate
+      return await this.prospectTransaction(async (tx) => {
+        const campaign = await tx.campaign.findFirst({
+          where: { id: campaignId, tenantId },
+          select: { id: true },
+        });
+        if (!campaign) throw new NotFoundException('Campaign not found');
+        const match = await this.matchUsing(
+          request,
+          tenantId,
+          tx,
+          Boolean(external),
+        );
+        if (match.strongProspect) {
+          throw this.matchConflict(
+            [match.strongProspect, ...match.candidates],
+            'Prospect identity already exists; request matches again',
+          );
+        }
+        if (!consciousCreate && match.candidates.length > 0) {
+          throw this.matchConflict(match.candidates);
+        }
+        const prospect = await tx.prospect.create({
+          data: {
+            tenantId,
+            campaignId,
+            name: request.name,
+            category: request.category,
+            address: request.address,
+            phone: request.phone,
+            email: request.email,
+            website: request.website,
+            language: request.language,
+            status: request.status,
+            metadata,
+            source: identity || external ? 'google_maps' : 'manual',
+            sourceIdentifier: identity?.identifier ?? null,
+            identitySource: identity?.source ?? null,
+            identityHash: identity?.hash ?? null,
+          },
+          select: prospectSelect,
+        });
+        await tx.campaignProspect.create({
+          data: { campaignId, prospectId: prospect.id },
+        });
+        await tx.prospectProvenance.create({
+          data: {
+            tenantId,
+            prospectId: prospect.id,
+            campaignId,
+            type: 'CREATED',
+            source: identity || external ? 'google_maps' : 'manual',
+            actorUserId,
+            ...(external
+              ? { details: this.acquisitionDetails(external) }
+              : consciousCreate
                 ? {
                     details: {
                       resolution: 'CREATE',
@@ -481,23 +614,19 @@ export class ProspectsService {
                     },
                   }
                 : {}),
-            },
-          });
-          await tx.campaignActivity.create({
-            data: {
-              tenantId,
-              campaignId,
-              prospectId: prospect.id,
-              type: 'ASSOCIATION',
-              actorUserId,
-            },
-          });
-          return this.toResponse(prospect);
-        },
-        {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        },
-      );
+          },
+        });
+        await tx.campaignActivity.create({
+          data: {
+            tenantId,
+            campaignId,
+            prospectId: prospect.id,
+            type: 'ASSOCIATION',
+            actorUserId,
+          },
+        });
+        return this.toResponse(prospect);
+      }, external);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -562,6 +691,12 @@ export class ProspectsService {
   async update(
     id: string,
     request: UpdateProspectRequest,
+    external?: {
+      tx: Prisma.TransactionClient;
+      batchId: string;
+      jobId: string;
+      identifier?: string;
+    },
   ): Promise<ProspectResponse> {
     const tenantId = this.tenantContext.requireTenantId();
     const actorUserId = this.tenantContext.getRequiredContext().userId;
@@ -592,50 +727,48 @@ export class ProspectsService {
     const metadata = this.prepareMetadata(request.metadata);
 
     try {
-      return await this.prisma.$transaction(
-        async (tx) => {
-          if (request.contextCampaignId !== undefined) {
-            const participation = await tx.campaignProspect.findFirst({
-              where: {
-                prospectId: id,
-                campaignId: request.contextCampaignId,
-                prospect: { tenantId },
-                campaign: { tenantId },
-              },
-              select: { campaignId: true },
-            });
-            if (!participation)
-              throw new NotFoundException('Participation not found');
-          }
-          const prospect = await tx.prospect.update({
-            where: { id, tenantId },
-            select: prospectSelect,
-            data: {
-              name: request.name,
-              category: request.category,
-              address: request.address,
-              phone: request.phone,
-              email: request.email,
-              website: request.website,
-              language: request.language,
-              status: request.status,
-              metadata,
+      return await this.prospectTransaction(async (tx) => {
+        if (request.contextCampaignId !== undefined) {
+          const participation = await tx.campaignProspect.findFirst({
+            where: {
+              prospectId: id,
+              campaignId: request.contextCampaignId,
+              prospect: { tenantId },
+              campaign: { tenantId },
             },
+            select: { campaignId: true },
           });
-          await tx.prospectProvenance.create({
-            data: {
-              tenantId,
-              prospectId: prospect.id,
-              campaignId: request.contextCampaignId ?? prospect.campaignId,
-              type: 'MASTER_UPDATED',
-              source: 'manual',
-              actorUserId,
-            },
-          });
-          return this.toResponse(prospect);
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
+          if (!participation)
+            throw new NotFoundException('Participation not found');
+        }
+        const prospect = await tx.prospect.update({
+          where: { id, tenantId },
+          select: prospectSelect,
+          data: {
+            name: request.name,
+            category: request.category,
+            address: request.address,
+            phone: request.phone,
+            email: request.email,
+            website: request.website,
+            language: request.language,
+            status: request.status,
+            metadata,
+          },
+        });
+        await tx.prospectProvenance.create({
+          data: {
+            tenantId,
+            prospectId: prospect.id,
+            campaignId: request.contextCampaignId ?? prospect.campaignId,
+            type: 'MASTER_UPDATED',
+            source: external ? 'google_maps' : 'manual',
+            actorUserId,
+            ...(external ? { details: this.acquisitionDetails(external) } : {}),
+          },
+        });
+        return this.toResponse(prospect);
+      }, external);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -654,6 +787,18 @@ export class ProspectsService {
 
       throw error;
     }
+  }
+
+  private acquisitionDetails(external: {
+    batchId: string;
+    jobId: string;
+    identifier?: string;
+  }) {
+    return {
+      batchId: external.batchId,
+      jobId: external.jobId,
+      ...(external.identifier ? { sourceIdentifier: external.identifier } : {}),
+    };
   }
 
   private toResponse(prospect: SelectedProspect): ProspectResponse {
