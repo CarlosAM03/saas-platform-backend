@@ -11,7 +11,7 @@ del Service y el pin de Engine permanecen vigentes.
 | Componente | Revisión consolidada | Trabajo siguiente |
 | --- | --- | --- |
 | Engine | `61ca0f0c881c2281b24ed48c0ece21c3aad8a964`, [PR #1](https://github.com/CarlosAM03/prospector-engine/pull/1) | CI acreditado 8/8. El Service conserva el pin probado `68aca39b42a21ae8c0b54b6e6ca93840fdad27e5`. |
-| Service | `bf150e4d4eeff80de83208446eb540d880e30048`, [PR #2](https://github.com/CarlosAM03/prospector-service/pull/2) | CI acreditado 9/9 para main. Controles SEC y runbook en el [PR #3](https://github.com/CarlosAM03/prospector-service/pull/3). |
+| Service | `6a6c3d01e10fd6b6a401518bcd5a76bf20bd4ecb`, [PR #3](https://github.com/CarlosAM03/prospector-service/pull/3) sobre la base `bf150e4d4eeff80de83208446eb540d880e30048` | [CI de main 9/9](https://github.com/CarlosAM03/prospector-service/actions/runs/45730341899). Aislamiento del bridge y sonda de egress en el [PR #4](https://github.com/CarlosAM03/prospector-service/pull/4). |
 | Backend | main `afe49e53a787625b50df0b9d27850f82cf52bfae`, dev `f231c8d820fe89849f74b10bde279a9fd53108ad` | CI acreditado 3/3 para main. Integración en el [Draft PR #13](https://github.com/CarlosAM03/saas-platform-backend/pull/13). |
 | Flutter | main `e752f6ca692d2840263cd9e59e0927c56aa129ec`, dev `2fdba28bf394d8a103b4f61deba98cd37061b2cd` | [PR #11](https://github.com/CarlosAM03/saas-platform-client/pull/11) y [PR #12](https://github.com/CarlosAM03/saas-platform-client/pull/12) esperan Backend compatible. Integración en el [Draft PR #14](https://github.com/CarlosAM03/saas-platform-client/pull/14). |
 
@@ -35,15 +35,17 @@ sigue pendiente.
 ## Orden operativo
 
 1. Verificar respaldo restaurable de Supabase y estado de las migraciones
-   antes de publicar Backend. En la última consulta a producción únicamente
-   constaba `20260909152421_init`. La secuencia histórica de CP incluye una
+   antes de promover Flutter. En la última consulta a producción únicamente
+   constaba `20260909152421_init`. Supabase tenía 1 de las 3 tablas CP
+   esperadas y 0 de las 4 tablas batch. La secuencia histórica de CP incluye una
    corrección que elimina filas derivadas de procedencia. El propietario
    valida el alcance de filas afectadas y ensaya sobre una restauración
    aislada antes de autorizar el procedimiento compatible.
-2. En Render, confirmar el servicio y comando de pre-deploy. Publicar la
-   revisión consolidada de Backend con generación deshabilitada. Verificar
-   el SHA activo, readiness, CORS y contrato CP. Confirmar la compatibilidad
-   con el frontend actualmente publicado.
+2. En Render, confirmar el servicio, la base Supabase conectada, el comando de
+   pre-deploy y el SHA activo. El 25 de noviembre readiness respondió 200 y
+   el OpenAPI servido contenía las 25 operaciones CP del handoff con definiciones
+   iguales, 39 rutas y 77 esquemas. Verificar migraciones, CORS y comportamiento
+   autenticado con una cuenta sintética sobre la revisión que vaya a servir Flutter.
 3. Con ese Backend disponible, integrar Flutter #11 con merge commit.
    Retargetear #12 a main, revisar diff y CI y fusionar con merge commit.
    Incorporar la historia documental exclusiva de dev según el handoff CT-03,
@@ -91,7 +93,18 @@ sigue pendiente.
   reconciliación, snapshot, exportación, persistencia, ACK y purga.
 - **PASS** — El cliente Flutter acreditó dos pruebas del contrato HTTP.
   El build de Vercel conserva el indicador de generación deshabilitado por
-  defecto.
+  defecto. Dos pruebas de widgets cubren la denegación de MEMBER antes de HTTP
+  y la reconciliación y revisión de un resultado parcial por OWNER. [CI Flutter 3/3](https://github.com/CarlosAM03/saas-platform-client/actions/runs/45730814431)
+- **PASS** — Los tres jobs de Backend para el código de integración cubren
+  calidad, regresión PostgreSQL y build de contenedor.
+  [CI del código de integración](https://github.com/CarlosAM03/saas-platform-backend/actions/runs/45730251263)
+- **PASS** — CI de Service con seccomp SEC-003 y sandbox en Chromium
+  sintético, una lane, cinco consultas y cinco snapshots. El perfil por
+  defecto de Docker falló en el mismo ensayo. El SBOM y la revisión
+  residual conservan cuatro hallazgos críticos del escáner. [Recibo de seguridad](https://github.com/CarlosAM03/prospector-service/actions/runs/45729655246/artifacts/15075544388)
+- **PASS** — Vercel producción figura `READY` en
+  `e752f6ca692d2840263cd9e59e0927c56aa129ec`.
+  [Despliegue observado](https://vercel.com/carlos-armentas-projects/saas-platform-client-web/81xLKLTjGfat1mnPmMvfbpA7Rims)
 - **NOT_RUN** — Ruta directa de callbacks Render–GCP, reinicio de procesos de
   producción, prueba live de Google Maps y concurrencia física de 25 workers.
 - **BLOCKED** — Publicación productiva coordinada hasta verificar migraciones
