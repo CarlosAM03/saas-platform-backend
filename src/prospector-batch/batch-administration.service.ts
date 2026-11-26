@@ -9,17 +9,50 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type ProspectingBatchConfirmation } from '@prisma/client';
 import { TenantContextService } from '../common/context/tenant-context.service';
+import { createPaginationMeta } from '../common/dto/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProspectsService } from '../prospects/prospects.service';
-import { BatchCallbackDto, CreateBatchDto, EventKind } from './batch.dto';
+import {
+  BatchCallbackDto,
+  BatchListDto,
+  ConfirmSnapshotDto,
+  CreateBatchDto,
+  EventKind,
+  ReviewAction,
+} from './batch.dto';
 import { BatchRuntime } from './batch-runtime';
-import { BatchTransportError } from './batch-transport';
-import { parseBatchStatus, parseSnapshot } from './remote-batch';
+import {
+  BatchTransportError,
+  type BatchScope,
+  type BatchTransport,
+} from './batch-transport';
+import {
+  checkPurge,
+  parseAck,
+  parseBatchStatus,
+  parseSnapshot,
+} from './remote-batch';
 
 const details = {
-  jobs: { orderBy: { position: 'asc' } },
+  jobs: {
+    orderBy: { position: 'asc' },
+    include: {
+      confirmations: {
+        orderBy: { committedAt: 'desc' },
+        take: 1,
+        select: {
+          snapshotId: true,
+          processedCount: true,
+          omittedCount: true,
+          committedAt: true,
+          ackAt: true,
+          purgedAt: true,
+        },
+      },
+    },
+  },
 } satisfies Prisma.ProspectingBatchInclude;
 type StoredBatch = Prisma.ProspectingBatchGetPayload<{
   include: typeof details;
@@ -200,6 +233,26 @@ export class BatchAdministrationService {
     return this.view((await this.owned(id)).batch);
   }
 
+  async list(query: BatchListDto) {
+    const { solutionId } = this.runtime.connect();
+    const { tenantId, userId: ownerId } = await this.identity();
+    const where = { solutionId, tenantId, ownerId };
+    const [batches, total] = await this.prisma.$transaction([
+      this.prisma.prospectingBatch.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+        include: details,
+      }),
+      this.prisma.prospectingBatch.count({ where }),
+    ]);
+    return {
+      data: batches.map((batch) => this.view(batch)),
+      meta: createPaginationMeta(query.page, query.limit, total),
+    };
+  }
+
   async reconcile(id: string) {
     const { batch, identity, transport } = await this.owned(id);
     try {
@@ -246,8 +299,7 @@ export class BatchAdministrationService {
 
   async preview(id: string, jobId: string) {
     const { batch, identity, transport } = await this.owned(id);
-    const job = batch.jobs.find((item) => item.id === jobId);
-    if (!job) throw new NotFoundException('Batch job not found');
+    const job = this.job(batch, jobId);
     if (job.availability && job.availability !== 'AVAILABLE') {
       throw new GoneException('Snapshot is no longer available');
     }
@@ -278,7 +330,7 @@ export class BatchAdministrationService {
               return {
                 index,
                 row,
-                ...(await this.prospects.match(row)),
+                ...(await this.prospects.matchExternal(row)),
                 blocked: false,
               };
             } catch (error) {
@@ -291,6 +343,241 @@ export class BatchAdministrationService {
     } catch (error) {
       throw this.upstream(error);
     }
+  }
+
+  async export(id: string, jobId: string, format: 'csv' | 'xlsx') {
+    const { batch, identity, transport } = await this.owned(id);
+    this.job(batch, jobId);
+    try {
+      return await transport.export(identity, id, jobId, format);
+    } catch (error) {
+      throw this.upstream(error);
+    }
+  }
+
+  async confirm(id: string, jobId: string, input: ConfirmSnapshotDto) {
+    const { batch, identity, transport } = await this.owned(id);
+    const job = this.job(batch, jobId);
+    const decisions = [...input.decisions].sort((a, b) => a.index - b.index);
+    const decisionHash = digest(
+      JSON.stringify(
+        decisions.map((item) => ({
+          index: item.index,
+          action: item.action,
+          candidateId: item.candidateId,
+          confirmSharedUpdate: item.confirmSharedUpdate ?? false,
+        })),
+      ),
+    );
+    const where = { jobId_snapshotId: { jobId, snapshotId: input.snapshotId } };
+    let receipt = await this.prisma.prospectingBatchConfirmation.findUnique({
+      where,
+    });
+    if (receipt) {
+      if (receipt.decisionHash !== decisionHash) {
+        throw new ConflictException('Snapshot decisions already committed');
+      }
+      return this.settle(identity, transport, id, receipt);
+    }
+    if (job.availability && job.availability !== 'AVAILABLE') {
+      throw new GoneException('Snapshot is no longer available');
+    }
+    if (job.availability !== 'AVAILABLE' || !job.quality) {
+      throw new ConflictException(
+        'Snapshot availability has not been confirmed',
+      );
+    }
+    let snapshot: ReturnType<typeof parseSnapshot>;
+    try {
+      snapshot = parseSnapshot(
+        await transport.readSnapshot(identity, id, jobId),
+        batch.campaignId,
+      );
+    } catch (error) {
+      throw this.upstream(error);
+    }
+    if (snapshot.id !== input.snapshotId) {
+      throw new ConflictException(
+        'Snapshot changed; review the current results',
+      );
+    }
+    if (snapshot.expiresAt.getTime() <= Date.now()) {
+      throw new GoneException('Snapshot is no longer available');
+    }
+    if (
+      decisions.length !== snapshot.rows.length ||
+      decisions.some(
+        (item, index) =>
+          item.index !== index ||
+          (item.action === ReviewAction.LINK_EXISTING ||
+            item.action === ReviewAction.UPDATE_EXISTING) !==
+            Boolean(item.candidateId) ||
+          (item.action === ReviewAction.UPDATE_EXISTING &&
+            item.confirmSharedUpdate !== true),
+      )
+    ) {
+      throw new BadRequestException(
+        'Provide one valid decision for every snapshot row',
+      );
+    }
+    try {
+      receipt = await this.prisma.$transaction(
+        async (tx) => {
+          await this.identity(tx);
+          const campaign = await tx.campaign.findFirst({
+            where: { id: batch.campaignId, tenantId: identity.tenantId },
+            select: { id: true },
+          });
+          if (!campaign) throw new NotFoundException('Campaign not found');
+          const current = await tx.prospectingBatchJob.findUniqueOrThrow({
+            where: { id: jobId },
+            select: { availability: true },
+          });
+          if (
+            current.availability !== 'AVAILABLE' ||
+            snapshot.expiresAt.getTime() <= Date.now()
+          ) {
+            throw new GoneException('Snapshot is no longer available');
+          }
+          const actions = decisions.filter(
+            (item) => item.action !== ReviewAction.SKIP,
+          );
+          const saved = await tx.prospectingBatchConfirmation.create({
+            data: {
+              jobId,
+              snapshotId: snapshot.id,
+              decisionHash,
+              processedCount: actions.length,
+              omittedCount: decisions.length - actions.length,
+            },
+          });
+          for (const item of decisions) {
+            if (item.action === ReviewAction.SKIP) continue;
+            await this.prospects.confirmExternal(
+              snapshot.rows[item.index],
+              {
+                action: item.action,
+                candidateId: item.candidateId,
+              },
+              { tx, batchId: id, jobId },
+            );
+          }
+          if (snapshot.expiresAt.getTime() <= Date.now()) {
+            throw new GoneException('Snapshot expired during processing');
+          }
+          return saved;
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: 15000,
+        },
+      );
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        !['P2002', 'P2034'].includes(error.code)
+      ) {
+        throw error;
+      }
+      receipt = await this.prisma.prospectingBatchConfirmation.findUnique({
+        where,
+      });
+      if (!receipt || receipt.decisionHash !== decisionHash) {
+        throw new ConflictException(
+          'Snapshot or prospect state changed; read the batch again',
+        );
+      }
+    }
+    return this.settle(identity, transport, id, receipt);
+  }
+
+  async settleSnapshot(id: string, jobId: string, snapshotId: string) {
+    const { batch, identity, transport } = await this.owned(id);
+    this.job(batch, jobId);
+    const receipt = await this.prisma.prospectingBatchConfirmation.findUnique({
+      where: { jobId_snapshotId: { jobId, snapshotId } },
+    });
+    if (!receipt)
+      throw new NotFoundException('Committed snapshot review not found');
+    return this.settle(identity, transport, id, receipt);
+  }
+
+  private async settle(
+    identity: BatchScope,
+    transport: BatchTransport,
+    batchId: string,
+    receipt: ProspectingBatchConfirmation,
+  ) {
+    if (!receipt.ackAt) {
+      try {
+        const { data } = await transport.acknowledge(
+          identity,
+          batchId,
+          receipt.jobId,
+        );
+        const ackAt = parseAck(data);
+        receipt = await this.prisma.prospectingBatchConfirmation.update({
+          where: { id: receipt.id },
+          data: { ackAt },
+        });
+      } catch (error) {
+        if (!(
+          error instanceof BatchTransportError ||
+          error instanceof BadGatewayException
+        ))
+          throw error;
+      }
+    }
+    // Preserve the snapshot for an explicit ACK reconciliation if delivery is uncertain.
+    if (receipt.ackAt && !receipt.purgedAt) {
+      try {
+        checkPurge(
+          (await transport.purge(identity, batchId, receipt.jobId)).data,
+        );
+        await this.prisma.$transaction([
+          this.prisma.prospectingBatchConfirmation.updateMany({
+            where: { id: receipt.id, purgedAt: null },
+            data: { purgedAt: new Date() },
+          }),
+          this.prisma.prospectingBatchJob.update({
+            where: { id: receipt.jobId },
+            data: { availability: 'PURGED' },
+          }),
+        ]);
+        receipt =
+          await this.prisma.prospectingBatchConfirmation.findUniqueOrThrow({
+            where: { id: receipt.id },
+          });
+      } catch (error) {
+        if (!(
+          error instanceof BatchTransportError ||
+          error instanceof BadGatewayException
+        ))
+          throw error;
+      }
+    }
+    const {
+      snapshotId,
+      processedCount,
+      omittedCount,
+      committedAt,
+      ackAt,
+      purgedAt,
+    } = receipt;
+    return {
+      snapshotId,
+      processedCount,
+      omittedCount,
+      committedAt,
+      ackAt,
+      purgedAt,
+    };
+  }
+
+  private job(batch: StoredBatch, id: string) {
+    const job = batch.jobs.find((item) => item.id === id);
+    if (!job) throw new NotFoundException('Batch job not found');
+    return job;
   }
 
   private async owned(id: string) {
@@ -408,11 +695,11 @@ export class BatchAdministrationService {
     });
   }
 
-  private async identity() {
+  private async identity(client: Prisma.TransactionClient = this.prisma) {
     const tenantId = this.context.requireTenantId();
     const claims = this.context.getRequiredContext();
     const [user, tenant] = await Promise.all([
-      this.prisma.user.findUnique({
+      client.user.findUnique({
         where: { id: claims.userId },
         select: {
           platformRole: true,
@@ -423,7 +710,7 @@ export class BatchAdministrationService {
           },
         },
       }),
-      this.prisma.tenant.findUnique({
+      client.tenant.findUnique({
         where: { id: tenantId },
         select: { status: true },
       }),
@@ -475,6 +762,7 @@ export class BatchAdministrationService {
         observedAt: job.observedAt,
         ackAt: job.ackAt,
         errorCode: job.errorCode,
+        confirmation: job.confirmations[0] ?? null,
       })),
     };
   }

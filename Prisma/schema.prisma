@@ -370,6 +370,7 @@ model ProspectingBatchJob {
   observedAt   DateTime?                @map("observed_at")
   batch        ProspectingBatch         @relation(fields: [batchId], references: [id], onDelete: Restrict)
   receipts     ProspectingBatchEvent[]
+  confirmations ProspectingBatchConfirmation[]
 
   @@unique([batchId, position])
   @@map("prospecting_batch_jobs")
@@ -385,6 +386,22 @@ model ProspectingBatchEvent {
 
   @@index([jobId, sequence])
   @@map("prospecting_batch_events")
+}
+
+model ProspectingBatchConfirmation {
+  id             String               @id @default(cuid())
+  jobId          String               @map("job_id")
+  snapshotId     String               @map("snapshot_id")
+  decisionHash   String               @map("decision_hash")
+  processedCount Int                  @map("processed_count")
+  omittedCount   Int                  @map("omitted_count")
+  committedAt    DateTime             @default(now()) @map("committed_at")
+  ackAt          DateTime?            @map("ack_at")
+  purgedAt       DateTime?            @map("purged_at")
+  job            ProspectingBatchJob  @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@unique([jobId, snapshotId])
+  @@map("prospecting_batch_confirmations")
 }
 
 enum OnboardingStatus {

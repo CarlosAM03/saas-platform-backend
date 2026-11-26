@@ -4,8 +4,10 @@ import {
   ArrayMinSize,
   Equals,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
+  IsIn,
   IsISO8601,
   IsObject,
   IsString,
@@ -56,6 +58,61 @@ export class CreateBatchDto {
   @ValidateNested({ each: true })
   @Type(() => BatchQueryDto)
   queries!: BatchQueryDto[];
+}
+
+export enum ReviewAction {
+  CREATE = 'CREATE',
+  LINK_EXISTING = 'LINK_EXISTING',
+  UPDATE_EXISTING = 'UPDATE_EXISTING',
+  SKIP = 'SKIP',
+}
+
+class ReviewRowDto {
+  @IsInt()
+  @Min(0)
+  @Max(149)
+  index!: number;
+
+  @IsEnum(ReviewAction)
+  action!: ReviewAction;
+
+  @ValidateIf((_: unknown, value: unknown) => value !== undefined)
+  @Matches(privateCuid)
+  candidateId?: string;
+
+  @ValidateIf((_: unknown, value: unknown) => value !== undefined)
+  @IsBoolean()
+  confirmSharedUpdate?: boolean;
+}
+
+export class ConfirmSnapshotDto {
+  @IsUUID()
+  snapshotId!: string;
+
+  @IsArray()
+  @ArrayMaxSize(150)
+  @ValidateNested({ each: true })
+  @Type(() => ReviewRowDto)
+  decisions!: ReviewRowDto[];
+}
+
+export class BatchListDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000)
+  page = 1;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 20;
+}
+
+export class BatchExportDto {
+  @IsIn(['csv', 'xlsx'])
+  format!: 'csv' | 'xlsx';
 }
 
 export enum EventKind {

@@ -50,6 +50,7 @@ interface Operation {
   path: string;
   scope: string;
   actor: 'owner' | 'platform';
+  query?: string;
   body?: string;
   idempotencyKey?: string;
 }
@@ -191,6 +192,43 @@ export class BatchTransport {
     });
   }
 
+  async export(
+    identity: BatchScope,
+    batchId: string,
+    jobId: string,
+    format: 'csv' | 'xlsx',
+  ): Promise<Response> {
+    if (format !== 'csv' && format !== 'xlsx') {
+      throw new TypeError('Invalid export format');
+    }
+    const response = await this.request(
+      identity,
+      {
+        method: 'GET',
+        path: `${jobPath(batchId, jobId)}/export`,
+        query: `format=${format}`,
+        actor: 'owner',
+        scope: 'prospecting:results:export',
+      },
+      false,
+    );
+    const expected =
+      format === 'csv'
+        ? 'text/csv'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (response.status !== 200 || !response.body) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new BatchTransportError('unavailable', response.status);
+    }
+    if (
+      response.headers.get('content-type')?.split(';')[0].trim() !== expected
+    ) {
+      await response.body.cancel().catch(() => undefined);
+      throw new BatchTransportError('invalid-response', response.status);
+    }
+    return response;
+  }
+
   private sign(identity: BatchScope, operation: Operation): string {
     if (!cuid.test(identity.tenantId) || !cuid.test(identity.userId)) {
       throw new TypeError('Invalid Platform identity');
@@ -208,7 +246,7 @@ export class BatchTransport {
       scope: operation.scope,
       method: operation.method,
       path: operation.path,
-      query: '',
+      query: operation.query ?? '',
       idempotencyKey: operation.idempotencyKey ?? '',
       bodySha256: createHash('sha256')
         .update(operation.body ?? '', 'utf8')
@@ -227,28 +265,7 @@ export class BatchTransport {
     operation: Operation,
   ): Promise<RemoteBatchEnvelope> {
     const isAdmission = operation.idempotencyKey !== undefined;
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-      'X-API-Key': this.config.apiKey,
-      'X-Platform-Assertion': this.sign(identity, operation),
-    };
-    if (isAdmission) {
-      headers['Idempotency-Key'] = operation.idempotencyKey!;
-      headers['Content-Type'] = 'application/json';
-    }
-
-    let response: Response;
-    try {
-      response = await this.http(this.origin + operation.path, {
-        method: operation.method,
-        headers,
-        body: operation.body,
-        redirect: 'error',
-        signal: AbortSignal.timeout(this.config.timeoutMs),
-      });
-    } catch {
-      throw new BatchTransportError(isAdmission ? 'uncertain' : 'unavailable');
-    }
+    const response = await this.request(identity, operation, isAdmission);
 
     const expected = isAdmission ? 202 : 200;
     if (response.status !== expected) {
@@ -282,6 +299,35 @@ export class BatchTransport {
       );
     }
     return { data: envelope.data, meta: envelope.meta };
+  }
+
+  private async request(
+    identity: BatchScope,
+    operation: Operation,
+    isAdmission: boolean,
+  ) {
+    const headers: Record<string, string> = {
+      Accept: operation.query ? '*/*' : 'application/json',
+      'X-API-Key': this.config.apiKey,
+      'X-Platform-Assertion': this.sign(identity, operation),
+    };
+    if (isAdmission) {
+      headers['Idempotency-Key'] = operation.idempotencyKey!;
+      headers['Content-Type'] = 'application/json';
+    }
+
+    try {
+      const query = operation.query ? `?${operation.query}` : '';
+      return await this.http(this.origin + operation.path + query, {
+        method: operation.method,
+        headers,
+        body: operation.body,
+        redirect: 'error',
+        signal: AbortSignal.timeout(this.config.timeoutMs),
+      });
+    } catch {
+      throw new BatchTransportError(isAdmission ? 'uncertain' : 'unavailable');
+    }
   }
 }
 

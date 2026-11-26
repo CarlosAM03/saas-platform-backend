@@ -143,3 +143,12 @@ export function parseSnapshot(
   });
   return { id, expiresAt, rows };
 }
+
+export function parseAck(data: unknown) {
+  if (!isRecord(data)) invalid();
+  return remoteDate(data.ackAt);
+}
+
+export function checkPurge(data: unknown): void {
+  if (!isRecord(data) || data.availability !== 'PURGED') invalid();
+}
