@@ -1,0 +1,244 @@
+openapi: 3.0.3
+info:
+  title: Platform API batch de prospección
+  version: 1.0.0
+  description: Contrato de NestJS de ADR-INT-BATCH-001. Disponible cuando se habilita la integración batch.
+paths:
+  /api/v1/prospecting-batches:
+    get:
+      summary: Listar lotes propios de la organización activa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Lotes administrativos en orden descendente de creación
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: '#/components/schemas/ExternalBatch' } }
+                  meta: { type: object, required: [page, limit, total, totalPages], additionalProperties: { type: integer } }
+        default: { description: Error HTTP o integración deshabilitada }
+    post:
+      summary: Registrar de 1 a 5 consultas hacia una campaña
+      security: [{ bearerAuth: [] }]
+      description: Idempotency-Key identifica los mismos datos para el mismo dueño, tenant y solución.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9._~-]{1,128}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExternalBatchRequest' }
+      responses:
+        '202': &batchResponse
+          description: Registro administrativo con el estado de admisión observado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: '#/components/schemas/ExternalBatch' }
+        '409': { description: Clave usada con otros datos }
+        default: { description: Error HTTP o integración deshabilitada }
+  /api/v1/prospecting-batches/{id}:
+    parameters: [ { $ref: '#/components/parameters/ExternalBatchId' } ]
+    get:
+      summary: Consultar un lote propio
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': *batchResponse
+        default: { description: Error HTTP o integración deshabilitada }
+  /api/v1/prospecting-batches/{id}/reconcile:
+    parameters: [ { $ref: '#/components/parameters/ExternalBatchId' } ]
+    post:
+      summary: Reconciliar con estado observado de Service
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': *batchResponse
+        default: { description: Error HTTP o integración deshabilitada }
+  /api/v1/prospecting-batches/{id}/jobs/{jobId}/results:
+    parameters: &jobParameters
+      - { $ref: '#/components/parameters/ExternalBatchId' }
+      - { $ref: '#/components/parameters/ExternalBatchJobId' }
+    get:
+      summary: Revisar un snapshot propio y sus coincidencias
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Snapshot temporal con filas y coincidencias para revisar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [snapshotId, expiresAt, quality, rows]
+                    properties:
+                      snapshotId: { type: string, format: uuid }
+                      expiresAt: { type: string, format: date-time }
+                      quality: { type: string, enum: [SUCCESS, SUCCESS_WITH_ISSUES, PARTIAL] }
+                      rows:
+                        type: array
+                        maxItems: 150
+                        items: { $ref: '#/components/schemas/ExternalBatchReviewRow' }
+        '410': { description: Snapshot vencido, purgado o no disponible }
+        default: { description: Error HTTP o integración deshabilitada }
+  /api/v1/prospecting-batches/{id}/jobs/{jobId}/export:
+    parameters: *jobParameters
+    get:
+      summary: Descargar un resultado propio del snapshot
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: format, in: query, required: true, schema: { type: string, enum: [csv, xlsx] } }
+      responses:
+        '200':
+          description: Exportación autorizada de Service
+          content:
+            text/csv: { schema: { type: string, format: binary } }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } }
+        default: { description: Error HTTP o integración deshabilitada }
+  /api/v1/prospecting-batches/{id}/jobs/{jobId}/confirm:
+    parameters: *jobParameters
+    post:
+      summary: Confirmar una decisión humana para cada fila
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [snapshotId, decisions]
+              properties:
+                snapshotId: { type: string, format: uuid }
+                decisions:
+                  type: array
+                  maxItems: 150
+                  items: { $ref: '#/components/schemas/ExternalBatchDecision' }
+      responses:
+        '200': &receiptResponse
+          description: Recibo durable con ACK y purga observados por separado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: '#/components/schemas/ExternalBatchConfirmation' }
+        '409': { description: Cambió el estado o la confirmación anterior usa otras decisiones }
+        '410': { description: Snapshot vencido, purgado o no disponible }
+        default: { description: Error HTTP o integración deshabilitada }
+  /api/v1/prospecting-batches/{id}/jobs/{jobId}/confirmations/{snapshotId}/settle:
+    parameters:
+      - { $ref: '#/components/parameters/ExternalBatchId' }
+      - { $ref: '#/components/parameters/ExternalBatchJobId' }
+      - { name: snapshotId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Reconciliar ACK y purga de una confirmación ya comprometida
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': *receiptResponse
+        default: { description: Error HTTP o integración deshabilitada }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    ExternalBatchId: { name: id, in: path, required: true, schema: { type: string } }
+    ExternalBatchJobId: { name: jobId, in: path, required: true, schema: { type: string } }
+  schemas:
+    ExternalBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [campaignId, queries]
+      properties:
+        campaignId: { type: string }
+        queries:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items:
+            type: object
+            additionalProperties: false
+            required: [source, keyword, location, limit]
+            properties:
+              source: { type: string, enum: [google_maps] }
+              keyword: { type: string, pattern: '\S' }
+              location: { type: string, pattern: '\S' }
+              limit: { type: integer, minimum: 1, maximum: 150 }
+    ExternalBatch:
+      type: object
+      required: [id, campaignId, admission, createdAt, acceptedAt, rejectionStatus, jobs]
+      properties:
+        id: { type: string }
+        campaignId: { type: string }
+        admission: { type: string, enum: [PENDING, ACCEPTED, UNCERTAIN, REJECTED] }
+        createdAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+        rejectionStatus: { type: integer, nullable: true }
+        remoteObserved: { type: boolean }
+        jobs: { type: array, minItems: 1, maxItems: 5, items: { $ref: '#/components/schemas/ExternalBatchJob' } }
+    ExternalBatchJob:
+      type: object
+      required: [id, position, sequence, state, availability, progress, confirmation]
+      properties:
+        id: { type: string }
+        position: { type: integer, minimum: 0, maximum: 4 }
+        sequence: { type: integer, minimum: 0 }
+        state: { type: string, nullable: true, enum: [QUEUED, RUNNING, AWAITING_RESULTS, COMPLETED, FAILED, INTERRUPTED, SKIPPED, null] }
+        availability: { type: string, nullable: true, enum: [AVAILABLE, EXPIRED, PURGED, UNAVAILABLE, null] }
+        progress: { type: object, nullable: true }
+        confirmation: { allOf: [{ $ref: '#/components/schemas/ExternalBatchConfirmation' }], nullable: true }
+    ExternalBatchReviewRow:
+      type: object
+      required: [index, row, blocked]
+      properties:
+        index: { type: integer, minimum: 0, maximum: 149 }
+        row:
+          type: object
+          required: [campaignId, name]
+          properties:
+            campaignId: { type: string }
+            name: { type: string }
+            address: { type: string, nullable: true }
+            phone: { type: string, nullable: true }
+            website: { type: string, nullable: true }
+            identityIdentifier: { type: string }
+        blocked: { type: boolean }
+        strongProspect: { type: object, nullable: true }
+        candidates: { type: array, items: { type: object } }
+        resolutionRequired: { type: boolean }
+    ExternalBatchDecision:
+      type: object
+      additionalProperties: false
+      required: [index, action]
+      properties:
+        index: { type: integer, minimum: 0, maximum: 149 }
+        action: { type: string, enum: [CREATE, LINK_EXISTING, UPDATE_EXISTING, SKIP] }
+        candidateId: { type: string }
+        confirmSharedUpdate: { type: boolean }
+    ExternalBatchConfirmation:
+      type: object
+      required: [snapshotId, processedCount, omittedCount, committedAt, ackAt, purgedAt]
+      properties:
+        snapshotId: { type: string, format: uuid }
+        processedCount: { type: integer, minimum: 0 }
+        omittedCount: { type: integer, minimum: 0 }
+        committedAt: { type: string, format: date-time }
+        ackAt: { type: string, format: date-time, nullable: true }
+        purgedAt: { type: string, format: date-time, nullable: true }
